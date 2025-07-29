@@ -6,12 +6,12 @@ dotenv.config();
 // GitHub Actions API 테스트
 async function testGitHubActionsAPI() {
     // GitHub Personal Access Token이 필요합니다
-    const GITHUB_TOKEN = 'YOUR_GITHUB_TOKEN'; // 여기에 토큰 입력
+    const GITHUB_TOKEN = process.env.GITHUB_TOKEN || 'YOUR_GITHUB_TOKEN_HERE';
     const OWNER = 'llkd33';
     const REPO = 'nc_new';
     const WORKFLOW_FILE = 'auto-post.yml';
     
-    if (GITHUB_TOKEN === 'YOUR_GITHUB_TOKEN') {
+    if (GITHUB_TOKEN === 'YOUR_GITHUB_TOKEN_HERE' || !GITHUB_TOKEN) {
         console.error('❌ GitHub Personal Access Token을 설정하세요!');
         console.log('\n토큰 생성 방법:');
         console.log('1. GitHub → Settings → Developer settings');
