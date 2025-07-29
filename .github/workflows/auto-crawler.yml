@@ -2,8 +2,8 @@ name: Naver Cafe Auto Crawler
 
 on:
   schedule:
-    # 매일 오전 9시, 오후 2시, 오후 7시 실행 (KST)
-    - cron: '0 0,5,10 * * *'  # UTC 기준
+    # 매일 오전 9시 실행 (KST = UTC+9)
+    - cron: '0 0 * * *'  # UTC 00:00 = KST 09:00
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
