@@ -5,6 +5,15 @@ on:
     # 매일 오전 10시, 오후 3시, 오후 8시 실행 (KST)
     - cron: '0 1,6,11 * * *'  # UTC 기준
   workflow_dispatch:  # 수동 실행 가능
+    inputs:
+      post_id:
+        description: 'Specific post ID to upload'
+        required: false
+        type: string
+      post_title:
+        description: 'Post title for logging'
+        required: false
+        type: string
   repository_dispatch:
     types: [new-post-available]
 
@@ -56,7 +65,12 @@ jobs:
         NAVER_ID: ${{ secrets.NAVER_ID }}
         NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
         HEADLESS: true
+        POST_ID: ${{ github.event.inputs.post_id }}
       run: |
+        echo "🚀 자동 포스팅 시작"
+        if [ -n "${{ github.event.inputs.post_title }}" ]; then
+          echo "📋 게시글: ${{ github.event.inputs.post_title }}"
+        fi
         node auto-post-direct.js
     
     - name: Notify Make.com
