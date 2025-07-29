@@ -1,0 +1,74 @@
+{
+  "scenario_name": "Naver Cafe API Auto Upload",
+  "modules": [
+    {
+      "position": 1,
+      "module": "Webhook",
+      "note": "크롤러에서 트리거"
+    },
+    {
+      "position": 2,
+      "module": "Supabase - Search Rows",
+      "config": {
+        "table": "naver_cafe_posts",
+        "filter": "status=eq.pending",
+        "order": "created_at_server.asc",
+        "limit": 1
+      }
+    },
+    {
+      "position": 3,
+      "module": "HTTP - Make a Request",
+      "name": "네이버 카페 API 글쓰기",
+      "config": {
+        "url": "https://openapi.naver.com/v1/cafe/{{YOUR_CAFE_ID}}/menu/{{YOUR_MENU_ID}}/articles",
+        "method": "POST",
+        "headers": {
+          "Authorization": "Bearer {{YOUR_ACCESS_TOKEN}}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "subject": "{{2.title}}",
+          "content": "{{2.content_html}}"
+        }
+      }
+    },
+    {
+      "position": 4,
+      "module": "Supabase - Update a Row",
+      "config": {
+        "table": "naver_cafe_posts",
+        "id": "{{2.id}}",
+        "values": {
+          "status": "uploaded",
+          "uploaded_at": "{{now}}"
+        }
+      }
+    },
+    {
+      "position": 5,
+      "module": "Router",
+      "routes": [
+        {
+          "label": "성공",
+          "filter": "{{3.statusCode}} = 200"
+        },
+        {
+          "label": "실패",
+          "filter": "{{3.statusCode}} != 200"
+        }
+      ]
+    }
+  ],
+  "error_handler": {
+    "module": "Supabase - Update a Row",
+    "config": {
+      "table": "naver_cafe_posts",
+      "id": "{{2.id}}",
+      "values": {
+        "status": "failed",
+        "error_message": "{{error.message}}"
+      }
+    }
+  }
+}

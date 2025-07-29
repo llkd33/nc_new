@@ -1,0 +1,9 @@
+{
+  "jobs": [
+    {
+      "name": "naver-cafe-crawler-daily",
+      "schedule": "0 6 * * *",
+      "function": "naver-cafe-crawler"
+    }
+  ]
+}

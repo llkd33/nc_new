@@ -1,0 +1,27 @@
+{
+  "name": "naver-cafe-crawler",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "네이버 카페 자동 크롤링 시스템",
+  "main": "crawler.js",
+  "scripts": {
+    "start": "node crawler.js",
+    "dev": "node --watch crawler.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.10.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.0",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.54.1",
+    "puppeteer": "^21.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

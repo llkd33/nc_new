@@ -1,0 +1,70 @@
+{
+  "name": "네이버 카페 크롤링 자동화",
+  "flow": [
+    {
+      "module": "Webhooks",
+      "action": "Custom webhook",
+      "position": 1,
+      "note": "크롤러에서 호출됨"
+    },
+    {
+      "module": "Supabase",
+      "action": "Search Rows",
+      "position": 2,
+      "mapping": {
+        "connection": "Supabase Connection",
+        "table": "naver_cafe_posts",
+        "filter": "status = 'pending'",
+        "order": "created_at_server ASC",
+        "limit": 10
+      }
+    },
+    {
+      "module": "Iterator",
+      "action": "Iterate through rows",
+      "position": 3,
+      "note": "각 게시글 처리"
+    },
+    {
+      "module": "Google Sheets",
+      "action": "Add a Row",
+      "position": 4,
+      "mapping": {
+        "spreadsheet": "네이버 카페 크롤링 데이터",
+        "sheet": "Sheet1",
+        "values": {
+          "A": "{{3.title}}",
+          "B": "{{3.content_html}}",
+          "C": "{{3.original_url}}",
+          "D": "{{3.cafe_name}}",
+          "E": "{{3.created_at}}",
+          "F": "pending",
+          "G": "{{now}}"
+        }
+      }
+    },
+    {
+      "module": "Supabase",
+      "action": "Update a Row",
+      "position": 5,
+      "mapping": {
+        "table": "naver_cafe_posts",
+        "id": "{{3.id}}",
+        "values": {
+          "status": "processing"
+        }
+      }
+    },
+    {
+      "module": "Gmail",
+      "action": "Send an Email",
+      "position": 6,
+      "run_once": true,
+      "mapping": {
+        "to": "your-email@gmail.com",
+        "subject": "네이버 카페 새 게시글 {{1.count}}개",
+        "content": "새로운 게시글이 Google Sheets에 저장되었습니다.\n\n확인하기: https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID\n\n수동으로 업로드 후 상태를 'uploaded'로 변경해주세요."
+      }
+    }
+  ]
+}
