@@ -1,0 +1,75 @@
+name: Manual Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'crawl'
+        type: choice
+        options:
+          - crawl
+          - post
+          - both
+      cafe_name:
+        description: 'Specific cafe name (optional)'
+        required: false
+        type: string
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+    
+    - name: Run Crawler
+      if: ${{ github.event.inputs.action == 'crawl' || github.event.inputs.action == 'both' }}
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: true
+        CAFE_NAME: ${{ github.event.inputs.cafe_name }}
+      run: |
+        if [ -n "$CAFE_NAME" ]; then
+          echo "크롤링 대상 카페: $CAFE_NAME"
+        fi
+        node crawler-optimized.js
+    
+    - name: Wait between actions
+      if: ${{ github.event.inputs.action == 'both' }}
+      run: sleep 30
+    
+    - name: Run Auto Poster
+      if: ${{ github.event.inputs.action == 'post' || github.event.inputs.action == 'both' }}
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: true
+      run: |
+        node auto-post-direct.js
+    
+    - name: Summary
+      run: |
+        echo "### 실행 완료 ✅" >> $GITHUB_STEP_SUMMARY
+        echo "- Action: ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Time: $(date)" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,45 @@
+name: Naver Cafe Auto Crawler
+
+on:
+  schedule:
+    # 매일 오전 9시, 오후 2시, 오후 7시 실행 (KST)
+    - cron: '0 0,5,10 * * *'  # UTC 기준
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+    
+    - name: Run crawler
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: true
+      run: |
+        node crawler-optimized.js
+    
+    - name: Upload logs
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: crawler-logs
+        path: logs/
