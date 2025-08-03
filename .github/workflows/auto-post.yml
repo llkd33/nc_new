@@ -34,9 +34,16 @@ jobs:
     
     - name: Install dependencies
       run: |
-        npm cache clean --force
-        npm install --legacy-peer-deps
-      timeout-minutes: 10  # npm install 타임아웃 추가
+        # npm 설정 - 빠른 설치를 위한 최적화
+        npm config set loglevel warn
+        npm config set progress false
+        npm config set fund false
+        npm config set audit false
+        
+        # package-lock.json이 있으므로 npm ci 사용 (더 빠르고 안정적)
+        # deprecated 경고가 있어도 계속 진행
+        npm ci --prefer-offline --no-optional 2>/dev/null || npm install --legacy-peer-deps --no-audit --no-fund
+      timeout-minutes: 8  # 타임아웃 단축
     
     - name: Install Playwright browsers
       run: npx playwright install chromium
