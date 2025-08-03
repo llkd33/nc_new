@@ -20,6 +20,7 @@ on:
 jobs:
   post:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # 전체 작업 타임아웃 추가
     
     steps:
     - name: Checkout code
@@ -32,10 +33,14 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: |
+        npm cache clean --force
+        npm install --legacy-peer-deps
+      timeout-minutes: 10  # npm install 타임아웃 추가
     
     - name: Install Playwright browsers
       run: npx playwright install chromium
+      timeout-minutes: 5
     
     - name: Check pending posts
       id: check
@@ -43,39 +48,105 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       run: |
-        node -e "
+        # 환경변수 확인
+        if [ -z "$SUPABASE_URL" ]; then
+          echo "⚠️ SUPABASE_URL is not set"
+          echo "has_posts=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        if [ -z "$SUPABASE_ANON_KEY" ]; then
+          echo "⚠️ SUPABASE_ANON_KEY is not set"
+          echo "has_posts=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # JavaScript 파일로 실행
+        cat > check-posts.js << 'EOF'
         import { createClient } from '@supabase/supabase-js';
-        const supabase = createClient(
-          process.env.SUPABASE_URL,
-          process.env.SUPABASE_ANON_KEY
-        );
-        const { data } = await supabase
-          .from('naver_cafe_posts')
-          .select('id')
-          .eq('status', 'pending')
-          .limit(1);
-        console.log(data && data.length > 0 ? 'has_posts=true' : 'has_posts=false');
-        " >> $GITHUB_OUTPUT
+        import dotenv from 'dotenv';
+        
+        dotenv.config();
+        
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          console.log('has_posts=false');
+          process.exit(0);
+        }
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        async function checkPosts() {
+          try {
+            const { data, error } = await supabase
+              .from('naver_cafe_posts')
+              .select('id')
+              .eq('status', 'pending')
+              .limit(1);
+            
+            if (error) {
+              console.error('Error:', error.message);
+              console.log('has_posts=false');
+            } else {
+              console.log(data && data.length > 0 ? 'has_posts=true' : 'has_posts=false');
+            }
+          } catch (err) {
+            console.error('Error:', err.message);
+            console.log('has_posts=false');
+          }
+        }
+        
+        checkPosts();
+        EOF
+        
+        node check-posts.js >> $GITHUB_OUTPUT
     
     - name: Run auto poster
-      if: steps.check.outputs.has_posts == 'true'
+      if: steps.check.outputs.has_posts == 'true' || github.event.inputs.post_id != ''
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         NAVER_ID: ${{ secrets.NAVER_ID }}
         NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
-        HEADLESS: true
+        HEADLESS: 'true'
         POST_ID: ${{ github.event.inputs.post_id }}
+      timeout-minutes: 5
       run: |
         echo "🚀 자동 포스팅 시작"
+        
+        # 환경변수 검증
+        if [ -z "$SUPABASE_URL" ]; then
+          echo "❌ SUPABASE_URL is not set"
+          exit 1
+        fi
+        
+        if [ -z "$SUPABASE_ANON_KEY" ]; then
+          echo "❌ SUPABASE_ANON_KEY is not set"
+          exit 1
+        fi
+        
+        if [ -z "$NAVER_ID" ] || [ -z "$NAVER_PASSWORD" ]; then
+          echo "❌ Naver credentials are not set"
+          exit 1
+        fi
+        
         if [ -n "${{ github.event.inputs.post_title }}" ]; then
           echo "📋 게시글: ${{ github.event.inputs.post_title }}"
         fi
+        
+        # headless 모드로 실행
         node auto-post-direct.js
     
     - name: Notify Make.com
       if: success()
+      continue-on-error: true  # 실패해도 워크플로우는 성공으로 처리
       run: |
-        curl -X POST ${{ secrets.MAKE_WEBHOOK_URL }} \
-          -H "Content-Type: application/json" \
-          -d '{"status": "completed", "source": "github-actions"}'
+        if [ -n "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
+          curl -X POST ${{ secrets.MAKE_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d '{"status": "completed", "source": "github-actions"}' || true
+        else
+          echo "ℹ️ MAKE_WEBHOOK_URL not configured, skipping notification"
+        fi
