@@ -82,13 +82,43 @@ async function postToNaverCafe() {
     await cafeFrame.fill('input[name="subject"]', `[자동] ${post.title}`);
     console.log('✅ 제목 입력 완료');
 
-    // 6. 본문 내용 입력
+    // 6. 이미지 URL 추출 (content_html 또는 image_urls 필드에서)
+    let imageUrls = [];
+    
+    // 방법 1: content_html에서 img 태그 추출
+    if (post.content_html) {
+      const imgMatches = post.content_html.match(/<img[^>]+src="([^">]+)"/g);
+      if (imgMatches) {
+        imageUrls = imgMatches
+          .map(tag => {
+            const match = tag.match(/src="([^">]+)"/);
+            return match && match[1];
+          })
+          .filter(Boolean);
+      }
+    }
+    
+    // 방법 2: image_urls 필드가 있다면 그것도 추가
+    if (post.image_urls && Array.isArray(post.image_urls)) {
+      imageUrls = [...imageUrls, ...post.image_urls];
+    }
+    
+    // 중복 제거
+    imageUrls = [...new Set(imageUrls)];
+    
+    if (imageUrls.length > 0) {
+      console.log(`🖼️ ${imageUrls.length}개의 이미지 발견`);
+    }
+
+    // 7. 본문 텍스트 추출 (이미지 태그 제외)
     const textContent = post.content_html
-      .replace(/<[^>]*>/g, '') // HTML 태그 제거
+      .replace(/<img[^>]*>/g, '') // 이미지 태그 제거
+      .replace(/<[^>]*>/g, '') // 나머지 HTML 태그 제거
       .replace(/&nbsp;/g, ' ')
       .replace(/\n\n+/g, '\n\n')
       .trim();
 
+    // 8. SmartEditor에 내용 및 이미지 입력
     const editorFrames = cafeFrame.childFrames();
     let contentEntered = false;
 
@@ -97,26 +127,110 @@ async function postToNaverCafe() {
         const editorFrame = editorFrames[0];
         const body = await editorFrame.waitForSelector('body', { timeout: 3000 });
         await body.click();
-        await editorFrame.keyboard.type(textContent);
-        console.log('✅ SmartEditor 내용 입력 완료');
+        
+        // 텍스트와 이미지를 혼합하여 입력
+        if (imageUrls.length > 0) {
+          console.log('🖋️ 텍스트와 이미지 혼합 입력 시작');
+          
+          // DOM 조작으로 내용 삽입
+          await editorFrame.evaluate((text, images) => {
+            // 기존 내용 초기화
+            document.body.innerHTML = '';
+            
+            // 텍스트를 단락별로 분리
+            const paragraphs = text.split('\n\n').filter(p => p.trim());
+            
+            // 텍스트와 이미지를 적절히 배치
+            paragraphs.forEach((paragraph, index) => {
+              // 텍스트 단락 추가
+              const p = document.createElement('p');
+              p.innerText = paragraph;
+              document.body.appendChild(p);
+              
+              // 2-3개 단락마다 이미지 삽입 (이미지가 있다면)
+              if (images.length > 0 && (index + 1) % 3 === 0) {
+                const imageIndex = Math.floor((index + 1) / 3 - 1);
+                if (imageIndex < images.length) {
+                  const img = document.createElement('img');
+                  img.src = images[imageIndex];
+                  img.style.maxWidth = '100%';
+                  img.style.height = 'auto';
+                  img.style.display = 'block';
+                  img.style.margin = '20px auto';
+                  
+                  const imgWrapper = document.createElement('div');
+                  imgWrapper.style.textAlign = 'center';
+                  imgWrapper.appendChild(img);
+                  document.body.appendChild(imgWrapper);
+                }
+              }
+            });
+            
+            // 남은 이미지들을 마지막에 추가
+            const insertedImageCount = Math.floor(paragraphs.length / 3);
+            if (insertedImageCount < images.length) {
+              const remainingImages = images.slice(insertedImageCount);
+              
+              // 구분선 추가
+              const hr = document.createElement('hr');
+              hr.style.margin = '30px 0';
+              document.body.appendChild(hr);
+              
+              // 이미지 갤러리 스타일로 추가
+              remainingImages.forEach(imageUrl => {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.display = 'block';
+                img.style.margin = '15px auto';
+                
+                const imgWrapper = document.createElement('div');
+                imgWrapper.style.textAlign = 'center';
+                imgWrapper.appendChild(img);
+                document.body.appendChild(imgWrapper);
+              });
+            }
+            
+          }, textContent, imageUrls);
+          
+          console.log('✅ SmartEditor 내용 및 이미지 입력 완료');
+        } else {
+          // 이미지가 없으면 텍스트만 입력
+          console.log('🖋️ 텍스트 입력 시작');
+          await editorFrame.keyboard.type(textContent);
+          console.log('✅ SmartEditor 텍스트 입력 완료');
+        }
+        
         contentEntered = true;
-      } catch {
-        console.log('⚠️ SmartEditor 입력 실패, textarea 시도');
+      } catch (e) {
+        console.log('⚠️ SmartEditor 입력 실패, textarea 시도:', e.message);
       }
     }
 
+    // 9. SmartEditor 실패 시 textarea 폴백 (텍스트만)
     if (!contentEntered) {
       try {
         await cafeFrame.waitForSelector('textarea[name="content"]', { timeout: 3000 });
-        await cafeFrame.fill('textarea[name="content"]', textContent);
-        console.log('✅ textarea 내용 입력 완료');
+        
+        // textarea에는 텍스트만 입력 (이미지 URL은 텍스트로 추가)
+        let fallbackContent = textContent;
+        if (imageUrls.length > 0) {
+          fallbackContent += '\n\n--- 첨부 이미지 ---\n';
+          imageUrls.forEach((url, idx) => {
+            fallbackContent += `\n[이미지 ${idx + 1}] ${url}`;
+          });
+        }
+        
+        await cafeFrame.fill('textarea[name="content"]', fallbackContent);
+        console.log('✅ textarea 내용 입력 완료 (폴백 모드)');
       } catch (e) {
         console.error('❌ 내용 입력 실패:', e.message);
         return;
       }
     }
 
-    // 7. 등록 버튼 클릭
+    // 10. 등록 버튼 클릭
     console.log('등록 버튼 찾는 중...');
     await page.waitForTimeout(1000);
 
@@ -138,7 +252,7 @@ async function postToNaverCafe() {
 
     await page.waitForTimeout(3000);
 
-    // 8. Supabase 상태 업데이트
+    // 11. Supabase 상태 업데이트
     await supabase
       .from('naver_cafe_posts')
       .update({
@@ -148,6 +262,10 @@ async function postToNaverCafe() {
       .eq('id', POST_ID);
 
     console.log('✅ 게시글 업로드 완료');
+    
+    if (imageUrls.length > 0) {
+      console.log(`📸 업로드된 이미지 수: ${imageUrls.length}`);
+    }
 
   } catch (err) {
     console.error('❌ 오류 발생:', err.message);
@@ -155,7 +273,10 @@ async function postToNaverCafe() {
     // 실패시 Supabase status = error 처리
     await supabase
       .from('naver_cafe_posts')
-      .update({ status: 'error' })
+      .update({ 
+        status: 'error',
+        error_message: err.message 
+      })
       .eq('id', POST_ID);
   } finally {
     await browser.close();
@@ -163,4 +284,5 @@ async function postToNaverCafe() {
 }
 
 console.log('🚀 네이버 카페 자동 업로드 시작');
+console.log('📍 이미지 자동 첨부 기능 포함');
 postToNaverCafe().then(() => console.log('✅ 프로그램 종료'));
