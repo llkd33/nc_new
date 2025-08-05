@@ -28,8 +28,16 @@ jobs:
         npm ci --prefer-offline --no-optional || npm install --legacy-peer-deps --no-audit --no-fund
       timeout-minutes: 8
     
-    - name: Install Playwright browsers
-      run: npx playwright install chromium
+    - name: Install browsers
+      run: |
+        # Playwright Chrome 설치
+        npx playwright install chromium
+        
+        # Chrome 브라우저 설치 (Selenium용)
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+        # ChromeDriver는 npm으로 설치됨
       timeout-minutes: 5
     
     - name: Run crawler
@@ -53,14 +61,14 @@ jobs:
         fi
         
         # 여러 크롤러 순차 시도
-        node crawler-stealth.js || {
-          echo "⚠️ Stealth 크롤러 실패, 개선된 크롤러 시도"
-          node crawler-improved.js || {
-            echo "⚠️ 개선된 크롤러 실패, 로그인 크롤러 시도"
-            node crawler-advanced.js || {
-              echo "⚠️ 로그인 크롤러 실패, 직접 URL 크롤러 시도"
-              node crawler-direct.js || {
-                echo "⚠️ 직접 크롤러 실패, 공개 게시글 크롤러 시도"
+        node crawler-selenium.js || {
+          echo "⚠️ Selenium 크롤러 실패, Stealth 크롤러 시도"
+          node crawler-stealth.js || {
+            echo "⚠️ Stealth 크롤러 실패, 개선된 크롤러 시도"
+            node crawler-improved.js || {
+              echo "⚠️ 개선된 크롤러 실패, 로그인 크롤러 시도"
+              node crawler-advanced.js || {
+                echo "⚠️ 로그인 크롤러 실패, 공개 게시글 크롤러 시도"
                 node crawler-public.js || {
                   echo "❌ 모든 크롤러 실패"
                   exit 1
