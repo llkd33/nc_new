@@ -193,33 +193,94 @@ async function crawlHotelLife(driver) {
         await driver.get(HOTEL_CAFE.cafeUrl);
         await delay(3000);
         
-        // iframe 찾기
-        const iframe = await driver.findElement(By.id('cafe_main'));
-        await driver.switchTo().frame(iframe);
-        await delay(1000);
+        // iframe 찾기 - 여러 방법 시도
+        let iframe;
+        try {
+            // 방법 1: ID로 찾기
+            iframe = await driver.findElement(By.id('cafe_main'));
+        } catch (e) {
+            try {
+                // 방법 2: name으로 찾기
+                iframe = await driver.findElement(By.name('cafe_main'));
+            } catch (e2) {
+                try {
+                    // 방법 3: 첫 번째 iframe
+                    iframe = await driver.findElement(By.tagName('iframe'));
+                } catch (e3) {
+                    console.error('❌ iframe을 찾을 수 없습니다');
+                    // iframe 없이 진행 시도
+                }
+            }
+        }
         
-        // 게시판으로 이동
-        const boardUrl = `/ArticleList.nhn?search.clubid=${HOTEL_CAFE.clubId}&search.menuid=${HOTEL_CAFE.menuId}`;
+        if (iframe) {
+            await driver.switchTo().frame(iframe);
+            await delay(1000);
+        }
+        
+        // 게시판으로 이동 - 직접 URL 접근
+        const boardUrl = `https://cafe.naver.com/ArticleList.nhn?search.clubid=${HOTEL_CAFE.clubId}&search.menuid=${HOTEL_CAFE.menuId}`;
         console.log(`📍 게시판 이동: ${boardUrl}`);
-        await driver.get(`https://cafe.naver.com${boardUrl}`);
+        await driver.get(boardUrl);
         await delay(3000);
         
-        // 다시 iframe으로 전환
-        await driver.switchTo().defaultContent();
-        const newIframe = await driver.findElement(By.id('cafe_main'));
-        await driver.switchTo().frame(newIframe);
+        // iframe으로 전환 시도
+        try {
+            await driver.switchTo().defaultContent();
+            const newIframe = await driver.findElement(By.id('cafe_main'));
+            await driver.switchTo().frame(newIframe);
+        } catch (e) {
+            console.log('⚠️ iframe 전환 실패, 현재 페이지에서 진행');
+        }
         
-        // 게시글 목록 수집
+        // 게시글 목록 수집 - 여러 선택자 시도
         const posts = await driver.executeScript(() => {
             const results = [];
-            const rows = document.querySelectorAll('.article-board tbody tr');
+            
+            // 다양한 게시판 선택자 시도
+            const selectors = [
+                '.article-board tbody tr',
+                '.board-list tbody tr',
+                '#main-area tbody tr',
+                'table.board-box tbody tr'
+            ];
+            
+            let rows = null;
+            for (const selector of selectors) {
+                rows = document.querySelectorAll(selector);
+                if (rows.length > 0) {
+                    console.log(`게시글 목록 발견: ${selector}`);
+                    break;
+                }
+            }
+            
+            if (!rows || rows.length === 0) {
+                console.log('게시글 목록을 찾을 수 없습니다');
+                return results;
+            }
             
             for (const row of rows) {
-                if (row.querySelector('.ico-list-notice')) continue;
+                // 공지사항 제외
+                if (row.querySelector('.ico-list-notice') || 
+                    row.querySelector('.notice') ||
+                    row.classList.contains('notice')) continue;
                 
-                const articleLink = row.querySelector('.td_article .article');
-                const authorElement = row.querySelector('.td_name .m-tcol-c');
-                const dateElement = row.querySelector('.td_date');
+                // 게시글 링크 찾기
+                const articleLink = row.querySelector('.article') || 
+                                  row.querySelector('a.title') ||
+                                  row.querySelector('.td_article a') ||
+                                  row.querySelector('td.title a');
+                
+                // 작성자 찾기
+                const authorElement = row.querySelector('.td_name .m-tcol-c') ||
+                                    row.querySelector('.td_name a') ||
+                                    row.querySelector('.writer') ||
+                                    row.querySelector('.nick');
+                
+                // 날짜 찾기
+                const dateElement = row.querySelector('.td_date') ||
+                                  row.querySelector('.date') ||
+                                  row.querySelector('td.date');
                 
                 if (articleLink && authorElement && dateElement) {
                     results.push({
@@ -237,6 +298,25 @@ async function crawlHotelLife(driver) {
         });
         
         console.log(`✅ ${posts.length}개 게시글 목록 수집`);
+        
+        // 게시글이 없으면 스크린샷 저장
+        if (posts.length === 0 && IS_GITHUB_ACTIONS) {
+            try {
+                const screenshot = await driver.takeScreenshot();
+                await fs.writeFile('no-posts-found.png', screenshot, 'base64');
+                console.log('📸 게시글 없음 스크린샷 저장');
+                
+                // 현재 URL 확인
+                const currentUrl = await driver.getCurrentUrl();
+                console.log(`📍 현재 URL: ${currentUrl}`);
+                
+                // 페이지 소스 일부 출력
+                const pageSource = await driver.getPageSource();
+                console.log(`📄 페이지 소스 일부: ${pageSource.substring(0, 500)}...`);
+            } catch (e) {
+                console.log('스크린샷 저장 실패:', e.message);
+            }
+        }
         
         // 각 게시글 상세 내용 수집
         for (let i = 0; i < posts.length; i++) {
@@ -488,22 +568,25 @@ async function main() {
         }
         
         // 호텔라이프 카페 크롤링
-        const posts = await crawlHotelLife(driver);
-        console.log(`\n✅ 총 ${posts.length}개 게시글 크롤링 완료`);
+        const crawledPosts = await crawlHotelLife(driver);
+        console.log(`\n✅ 총 ${crawledPosts.length}개 게시글 크롤링 완료`);
         
-        if (posts.length > 0) {
+        if (crawledPosts.length > 0) {
+            allCrawledPosts.push(...crawledPosts);
+            
             // 게시글 저장
             console.log(`\n💾 게시글 저장 중...`);
-            const savedPosts = await saveToSupabase(posts);
+            const savedPosts = await saveToSupabase(crawledPosts);
             
             // 포스팅
             if (savedPosts.length > 0) {
                 console.log(`\n📤 ${savedPosts.length}개 게시글 포스팅 시작...`);
-                allPostedPosts = await postToCafe(driver, savedPosts);
+                const postedPosts = await postToCafe(driver, savedPosts);
+                allPostedPosts.push(...postedPosts);
                 
                 // 포스팅 상태 업데이트
-                if (allPostedPosts.length > 0) {
-                    const urls = allPostedPosts.map(p => p.original_url);
+                if (postedPosts.length > 0) {
+                    const urls = postedPosts.map(p => p.original_url);
                     await supabase
                         .from('naver_cafe_posts')
                         .update({ status: 'posted', posted_at: new Date().toISOString() })
@@ -522,7 +605,7 @@ async function main() {
     }
     
     console.log(`\n✨ 작업 완료!`);
-    console.log(`📊 크롤링: ${posts ? posts.length : 0}개`);
+    console.log(`📊 크롤링: ${allCrawledPosts.length}개`);
     console.log(`📤 포스팅: ${allPostedPosts.length}개`);
 }
 

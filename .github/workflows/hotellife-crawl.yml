@@ -41,3 +41,12 @@ jobs:
         echo "📅 실행 시간: $(date '+%Y-%m-%d %H:%M:%S')"
         node selenium-hotellife.js
         echo "✅ 크롤링 완료"
+    
+    - name: Upload screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: crawl-screenshots
+        path: |
+          *.png
+          *.jpg
