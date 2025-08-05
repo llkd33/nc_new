@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Builder, By, until, Key } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
+import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import fs from 'fs/promises';
 
@@ -466,10 +467,30 @@ async function updatePostedStatus(postedPosts) {
 async function main(mode = 'all') {
     console.log('🚀 Selenium 올인원 크롤러 & 포스터 시작');
     console.log(`📋 모드: ${mode} (all/crawl/post)`);
+    console.log(`🔧 환경: ${IS_GITHUB_ACTIONS ? 'GitHub Actions' : 'Local'}`);
+    console.log(`👤 계정: ${NAVER_ID ? NAVER_ID.substring(0, 3) + '***' : 'Not Set'}`);
+    
+    // 환경변수 체크
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        console.error('❌ Supabase 설정이 필요합니다.');
+        console.error(`SUPABASE_URL: ${SUPABASE_URL ? 'Set' : 'Not Set'}`);
+        console.error(`SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY ? 'Set' : 'Not Set'}`);
+        process.exit(1);
+    }
     
     if (!NAVER_ID || !NAVER_PASSWORD) {
         console.error('❌ 네이버 로그인 정보가 필요합니다.');
+        console.error(`NAVER_ID: ${NAVER_ID ? 'Set' : 'Not Set'}`);
+        console.error(`NAVER_PASSWORD: ${NAVER_PASSWORD ? 'Set' : 'Not Set'}`);
         process.exit(1);
+    }
+    
+    // Chrome 및 ChromeDriver 확인
+    try {
+        const chromeVersion = execSync('google-chrome --version').toString().trim();
+        console.log(`🔍 Chrome 버전: ${chromeVersion}`);
+    } catch (e) {
+        console.error('⚠️ Chrome이 설치되어 있지 않습니다.');
     }
     
     // Chrome 옵션 설정
@@ -490,13 +511,22 @@ async function main(mode = 'all') {
         options.addArguments('--headless=new');
     }
     
-    const driver = await new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(options)
-        .build();
-    
+    let driver;
     const allCrawledPosts = [];
     let allPostedPosts = [];
+    
+    try {
+        console.log('🌐 Chrome 브라우저 시작 중...');
+        driver = await new Builder()
+            .forBrowser('chrome')
+            .setChromeOptions(options)
+            .build();
+        console.log('✅ 브라우저 시작 완료');
+    } catch (error) {
+        console.error('❌ 브라우저 시작 실패:', error.message);
+        console.error('Chrome 설치 확인이 필요합니다.');
+        process.exit(1);
+    }
     
     try {
         // 타임아웃 설정
@@ -580,9 +610,17 @@ async function main(mode = 'all') {
         }
         
     } catch (error) {
-        console.error('❌ 작업 중 오류:', error);
+        console.error('❌ 작업 중 오류:', error.message);
+        console.error('상세 오류:', error);
     } finally {
-        await driver.quit();
+        if (driver) {
+            try {
+                await driver.quit();
+                console.log('🔚 브라우저 종료');
+            } catch (e) {
+                console.error('브라우저 종료 중 오류:', e.message);
+            }
+        }
     }
     
     console.log(`\n✨ 작업 완료!`);

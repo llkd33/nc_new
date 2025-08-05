@@ -20,10 +20,25 @@ jobs:
     - name: Install dependencies
       run: npm install
     
-    - name: Install Chrome
+    - name: Install Chrome and ChromeDriver
       run: |
+        # Chrome 설치
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
+        
+        # Chrome 버전 확인
+        google-chrome --version
+        
+        # ChromeDriver 설치 (npm에서 자동 처리)
+        npm list chromedriver || echo "ChromeDriver will be installed with npm"
+    
+    - name: Test Selenium Setup
+      env:
+        HEADLESS: 'true'
+        GITHUB_ACTIONS: 'true'
+      run: |
+        echo "🧪 Selenium 설정 테스트"
+        node test-selenium.js
     
     - name: Run Selenium Crawler
       env:
