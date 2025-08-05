@@ -36,15 +36,21 @@ jobs:
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
         HEADLESS: 'true'
+        GITHUB_ACTIONS: 'true'
       timeout-minutes: 20
       run: |
         echo "🕷️ 네이버 카페 크롤링 시작"
         echo "📍 부동산스터디, 부린이집 카페 크롤링"
-        echo "🌐 공개 게시글만 수집 (로그인 불필요)"
+        echo "🔐 네이버 로그인 후 전체 게시글 수집"
         
-        # 공개 게시글 크롤러 실행
-        node crawler-public.js
+        # 로그인 크롤러 실행
+        node crawler-advanced.js || {
+          echo "⚠️ 로그인 크롤러 실패, 공개 게시글 크롤러로 대체"
+          node crawler-public.js
+        }
         
         echo "✅ 크롤링 완료"
     

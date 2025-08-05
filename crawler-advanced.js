@@ -116,49 +116,136 @@ async function loginToNaver(page) {
     console.log('🔐 네이버 로그인 시도...');
     
     try {
+        // 로그인 페이지로 이동
         await page.goto('https://nid.naver.com/nidlogin.login', {
-            waitUntil: 'networkidle'
+            waitUntil: 'domcontentloaded',
+            timeout: 60000
         });
         
-        // 봇 감지 우회
-        await page.evaluate(() => {
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => false
-            });
-        });
+        // 페이지 로드 대기
+        await page.waitForSelector('#id', { visible: true, timeout: 10000 });
+        await randomDelay(2000, 3000);
         
-        // 아이디 입력
-        await page.click('#id');
-        await page.keyboard.type(NAVER_ID, { delay: 100 });
+        // 아이디 입력 - 더 자연스럽게
+        const idInput = await page.$('#id');
+        await idInput.click();
         await randomDelay(500, 1000);
+        
+        // 한 글자씩 천천히 입력
+        for (const char of NAVER_ID) {
+            await page.keyboard.type(char);
+            await randomDelay(100, 300);
+        }
+        
+        await randomDelay(1000, 2000);
         
         // 비밀번호 입력
-        await page.click('#pw');
-        await page.keyboard.type(NAVER_PASSWORD, { delay: 100 });
+        const pwInput = await page.$('#pw');
+        await pwInput.click();
         await randomDelay(500, 1000);
         
+        // 비밀번호도 천천히 입력
+        for (const char of NAVER_PASSWORD) {
+            await page.keyboard.type(char);
+            await randomDelay(100, 300);
+        }
+        
+        await randomDelay(1000, 2000);
+        
+        // 로그인 유지 체크 해제 (있는 경우)
+        try {
+            const keepLogin = await page.$('#keep');
+            if (keepLogin) {
+                const isChecked = await page.evaluate(el => el.checked, keepLogin);
+                if (isChecked) {
+                    await keepLogin.click();
+                }
+            }
+        } catch (e) {
+            // 로그인 유지 옵션이 없을 수 있음
+        }
+        
         // 로그인 버튼 클릭
-        await page.click('.btn_login');
+        console.log('🔄 로그인 버튼 클릭...');
+        await Promise.all([
+            page.waitForNavigation({ 
+                waitUntil: 'networkidle', 
+                timeout: 60000 
+            }).catch(e => console.log('Navigation timeout - continuing...')),
+            page.click('.btn_login')
+        ]);
         
-        // 로그인 완료 대기
-        await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
+        // 잠시 대기
+        await randomDelay(3000, 5000);
         
-        // 로그인 성공 확인
-        const isLoggedIn = await page.evaluate(() => {
-            return !window.location.href.includes('nidlogin');
-        });
+        // 로그인 성공 확인 - 여러 방법으로 시도
+        let isLoggedIn = false;
+        
+        // 방법 1: URL 확인
+        const currentUrl = page.url();
+        if (!currentUrl.includes('nidlogin') && !currentUrl.includes('login')) {
+            isLoggedIn = true;
+        }
+        
+        // 방법 2: 로그인 후 리다이렉트 확인
+        if (!isLoggedIn) {
+            try {
+                await page.goto('https://naver.com', { waitUntil: 'domcontentloaded' });
+                await page.waitForSelector('body', { timeout: 5000 });
+                
+                // 로그아웃 버튼이 있는지 확인
+                const hasLogoutBtn = await page.evaluate(() => {
+                    return document.querySelector('.link_logout') !== null || 
+                           document.querySelector('[class*="logout"]') !== null ||
+                           document.querySelector('.MyView-module__link_logout') !== null;
+                });
+                
+                if (hasLogoutBtn) {
+                    isLoggedIn = true;
+                }
+            } catch (e) {
+                console.log('로그인 확인 중 오류:', e.message);
+            }
+        }
         
         if (isLoggedIn) {
             console.log('✅ 로그인 성공');
             await saveCookies(page);
             return true;
         } else {
-            console.error('❌ 로그인 실패');
+            console.error('❌ 로그인 실패 - 캡차 또는 보안 문자가 필요할 수 있습니다');
+            
+            // 디버그용 스크린샷 (GitHub Actions에서)
+            if (process.env.GITHUB_ACTIONS) {
+                try {
+                    await page.screenshot({ 
+                        path: 'login-failed.png',
+                        fullPage: true 
+                    });
+                    console.log('📸 로그인 실패 스크린샷 저장됨');
+                } catch (e) {
+                    console.log('스크린샷 저장 실패:', e.message);
+                }
+            }
+            
             return false;
         }
         
     } catch (error) {
         console.error('❌ 로그인 중 오류:', error.message);
+        
+        // 디버그용 스크린샷
+        if (process.env.GITHUB_ACTIONS) {
+            try {
+                await page.screenshot({ 
+                    path: 'login-error.png',
+                    fullPage: true 
+                });
+            } catch (e) {
+                // 무시
+            }
+        }
+        
         return false;
     }
 }
@@ -439,7 +526,15 @@ export async function crawlAllCafes() {
             '--disable-blink-features=AutomationControlled',
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage'
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins',
+            '--disable-site-isolation-trials',
+            '--disable-accelerated-2d-canvas',
+            '--window-size=1920,1080',
+            '--start-maximized',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ]
     });
     
@@ -447,11 +542,59 @@ export async function crawlAllCafes() {
     
     try {
         const context = await browser.newContext({
-            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport: { width: 1920, height: 1080 }
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            viewport: { width: 1920, height: 1080 },
+            locale: 'ko-KR',
+            timezoneId: 'Asia/Seoul',
+            permissions: ['geolocation'],
+            extraHTTPHeaders: {
+                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
         });
         
         const page = await context.newPage();
+        
+        // 봇 감지 우회 설정 - 페이지 생성 직후
+        await page.evaluateOnNewDocument(() => {
+            // webdriver 속성 제거
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            
+            // Chrome 자동화 플래그 제거
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            
+            // 언어 설정
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['ko-KR', 'ko', 'en-US', 'en']
+            });
+            
+            // 권한 API 오버라이드
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            
+            // Chrome 드라이버 확인 우회
+            window.chrome = {
+                runtime: {}
+            };
+            
+            // Notification 권한
+            Object.defineProperty(navigator, 'permissions', {
+                get: () => ({
+                    query: () => Promise.resolve({ state: 'granted' })
+                })
+            });
+        });
         
         // 디버그 모드
         if (DEBUG_MODE) {
