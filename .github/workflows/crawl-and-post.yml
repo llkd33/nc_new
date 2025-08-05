@@ -44,13 +44,12 @@ jobs:
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        NAVER_ID: ${{ secrets.NAVER_ID }}
-        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
         HEADLESS: 'true'
       timeout-minutes: 20
       run: |
         echo "🕷️ 네이버 카페 크롤링 시작"
-        node crawler-advanced.js || echo "⚠️ 크롤링 중 일부 오류 발생 (계속 진행)"
+        echo "🌐 공개 게시글만 수집 (로그인 불필요)"
+        node crawler-public.js || echo "⚠️ 크롤링 중 일부 오류 발생 (계속 진행)"
         echo "✅ 크롤링 단계 완료"
     
     # 30분 대기 (크롤링 데이터 안정화)
