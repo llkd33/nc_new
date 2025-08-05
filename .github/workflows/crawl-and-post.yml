@@ -60,8 +60,14 @@ jobs:
         fi
         
         node crawler-advanced.js || {
-          echo "⚠️ 로그인 크롤러 실패, 공개 게시글 크롤러로 대체"
-          node crawler-public.js || echo "⚠️ 크롤링 중 일부 오류 발생 (계속 진행)"
+          echo "⚠️ 로그인 크롤러 실패, 모바일 크롤러 시도"
+          node crawler-mobile.js || {
+            echo "⚠️ 모바일 크롤러 실패, 검색 크롤러 시도"
+            node crawler-api.js || {
+              echo "⚠️ 검색 크롤러 실패, 공개 게시글 크롤러 시도"
+              node crawler-public.js || echo "⚠️ 크롤링 중 일부 오류 발생 (계속 진행)"
+            }
+          }
         }
         echo "✅ 크롤링 단계 완료"
     
