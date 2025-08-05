@@ -1,0 +1,44 @@
+name: Generate Naver Cookies
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-cookies:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: |
+        npm ci || npm install
+    
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+    
+    - name: Generate cookies with Selenium
+      env:
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: 'false'
+      run: |
+        echo "🍪 쿠키 생성을 위한 로그인 시도..."
+        node save-cookies.js || echo "수동 개입이 필요합니다"
+    
+    - name: Upload screenshots
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: login-screenshots
+        path: |
+          *.png
+          naver_cookies.json
