@@ -1,0 +1,74 @@
+name: Selenium All-in-One (Crawl & Post)
+
+on:
+  schedule:
+    # 매일 오전 10시 실행 (KST)
+    - cron: '0 1 * * *'  # UTC 기준
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  selenium-all-in-one:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm config set loglevel warn
+        npm config set progress false
+        npm ci --prefer-offline --no-optional || npm install --legacy-peer-deps --no-audit --no-fund
+      timeout-minutes: 8
+    
+    - name: Install Chrome browser
+      run: |
+        # Chrome 브라우저 설치
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+        # Chrome 버전 확인
+        google-chrome --version
+      timeout-minutes: 5
+    
+    - name: Run Selenium All-in-One
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: 'true'
+        GITHUB_ACTIONS: 'true'
+      timeout-minutes: 45
+      run: |
+        echo "🚀 Selenium 올인원 크롤러 & 포스터 시작"
+        echo "📍 부동산스터디, 부린이집 → atohealing 카페"
+        echo "🔐 네이버 계정: ${{ secrets.NAVER_ID }}"
+        
+        # Selenium 올인원 실행
+        node selenium-all-in-one.js
+        
+        echo "✅ 작업 완료"
+    
+    - name: Upload screenshots on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: selenium-screenshots
+        path: |
+          *.png
+          selenium_cookies.json
+    
+    - name: Summary
+      if: always()
+      run: |
+        echo "## 📊 Selenium 올인원 작업 요약" >> $GITHUB_STEP_SUMMARY
+        echo "- 상태: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- 실행 시간: $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY

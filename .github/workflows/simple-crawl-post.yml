@@ -1,0 +1,60 @@
+name: Simple Crawl and Post
+
+on:
+  schedule:
+    # 매일 오전 10시 실행 (KST)
+    - cron: '0 1 * * *'  # UTC 기준
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  crawl-and-post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm ci || npm install
+      timeout-minutes: 5
+    
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        google-chrome --version
+      timeout-minutes: 5
+    
+    - name: Run Selenium All-in-One (Crawl + Post)
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: 'true'
+        GITHUB_ACTIONS: 'true'
+      run: |
+        echo "🚀 시작: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "📍 부동산스터디, 부린이집 → atohealing"
+        
+        # 올인원 실행 (크롤링 + 포스팅)
+        node selenium-all-in-one.js all
+        
+        echo "✅ 완료: $(date '+%Y-%m-%d %H:%M:%S')"
+    
+    - name: Upload artifacts on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: error-screenshots
+        path: |
+          *.png
+          *.json

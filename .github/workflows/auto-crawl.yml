@@ -54,36 +54,28 @@ jobs:
         echo "🕷️ 네이버 카페 크롤링 시작"
         echo "📍 부동산스터디, 부린이집 카페 크롤링"
         
-        # 쿠키 확인
-        if [ -n "${{ secrets.NAVER_COOKIES }}" ]; then
-          echo "🍪 저장된 쿠키 사용"
-          # 쿠키가 있으면 advanced 크롤러 사용
-          node crawler-advanced.js
-        else
-          echo "🔐 네이버 계정으로 로그인 시도"
-          # 최종 Selenium 크롤러 실행 (JavaScript 실행 방식)
-          echo "🔥 최종 Selenium 크롤러 실행 중..."
-          node crawler-selenium-final.js
-        fi
+        # Selenium 올인원 크롤러 우선 시도
+        echo "🚀 Selenium 올인원 크롤러 실행 (크롤링만)..."
+        node selenium-all-in-one.js
         
         if [ $? -ne 0 ]; then
-          echo "⚠️ 최종 크롤러 실패, 개선된 크롤러 시도..."
-          node crawler-selenium-improved.js
+          echo "⚠️ 올인원 크롤러 실패, 쿠키 기반 시도..."
+          
+          # 쿠키 확인
+          if [ -n "${{ secrets.NAVER_COOKIES }}" ]; then
+            echo "🍪 저장된 쿠키 사용"
+            node crawler-advanced.js
+          else
+            echo "🔥 최종 Selenium 크롤러 실행..."
+            node crawler-selenium-final.js
+          fi
           
           if [ $? -ne 0 ]; then
-            echo "⚠️ 개선된 크롤러 실패, 기본 Selenium 시도..."
-            node crawler-selenium.js
-            
-            if [ $? -ne 0 ]; then
-              echo "⚠️ Selenium 실패, Stealth 크롤러 시도..."
-              node crawler-stealth.js || {
-                echo "⚠️ 모든 로그인 시도 실패, 공개 게시글만 크롤링..."
-                node crawler-public.js || {
-                  echo "❌ 모든 크롤러 실패"
-                  exit 1
-                }
-              }
-            fi
+            echo "⚠️ 모든 로그인 시도 실패, 공개 게시글만 크롤링..."
+            node crawler-public.js || {
+              echo "❌ 모든 크롤러 실패"
+              exit 1
+            }
           fi
         fi
         
