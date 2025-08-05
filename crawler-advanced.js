@@ -10,8 +10,8 @@ dotenv.config();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL;
-// const NAVER_ID = process.env.NAVER_ID;  // 크롤링에는 불필요
-// const NAVER_PASSWORD = process.env.NAVER_PASSWORD;  // 크롤링에는 불필요
+const NAVER_ID = process.env.NAVER_ID;
+const NAVER_PASSWORD = process.env.NAVER_PASSWORD;
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
 const HEADLESS = process.env.HEADLESS !== 'false';
 
@@ -428,8 +428,10 @@ export async function crawlAllCafes() {
     console.log('🚀 네이버 카페 크롤링 시작');
     console.log(`⚙️  설정: ${CRAWL_CONFIG.POSTS_PER_CAFE}개씩, 최근 ${CRAWL_CONFIG.CRAWL_PERIOD_DAYS}일`);
     
-    // 크롤링에는 로그인이 필요없음 (공개 게시판만 크롤링)
-    console.log('📍 공개 게시판 크롤링 모드');
+    if (!NAVER_ID || !NAVER_PASSWORD) {
+        console.error('❌ 네이버 계정 정보가 없습니다. 환경변수를 확인하세요.');
+        return [];
+    }
     
     const browser = await chromium.launch({
         headless: HEADLESS,
@@ -457,8 +459,30 @@ export async function crawlAllCafes() {
             page.on('pageerror', error => console.log('Page error:', error.message));
         }
         
-        // 크롤링에는 로그인 불필요 - 공개 게시판만 접근
-        console.log('🌐 공개 게시판 접근 중...');
+        // 쿠키 로드 시도
+        const hasStoredCookies = await loadCookies(context);
+        
+        // 로그인 체크
+        if (!hasStoredCookies) {
+            const loginSuccess = await loginToNaver(page);
+            if (!loginSuccess) {
+                throw new Error('네이버 로그인 실패');
+            }
+        } else {
+            // 쿠키로 로그인 상태 확인
+            await page.goto('https://naver.com');
+            const isLoggedIn = await page.evaluate(() => {
+                return document.querySelector('.link_login') === null;
+            });
+            
+            if (!isLoggedIn) {
+                console.log('⚠️  쿠키 만료, 재로그인 필요');
+                const loginSuccess = await loginToNaver(page);
+                if (!loginSuccess) {
+                    throw new Error('네이버 로그인 실패');
+                }
+            }
+        }
         
         // 각 카페 크롤링
         for (const [cafeName, cafeConfig] of Object.entries(CAFE_CONFIG)) {
