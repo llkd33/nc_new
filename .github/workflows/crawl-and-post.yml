@@ -65,24 +65,20 @@ jobs:
       run: sleep 5
     
     # 포스팅 단계
-    - name: Run auto poster
+    - name: Run auto poster (all today's posts)
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         NAVER_ID: ${{ secrets.NAVER_ID }}
         NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
         HEADLESS: 'true'
-      timeout-minutes: 10
+      timeout-minutes: 30  # 10개 게시글 업로드 시간 고려
       run: |
-        echo "🚀 자동 포스팅 시작"
+        echo "🚀 오늘 크롤링한 모든 게시글 포스팅 시작"
+        echo "📅 날짜: $(date '+%Y-%m-%d')"
         
-        # 최대 3개까지 연속 포스팅
-        for i in 1 2 3; do
-          echo "📝 포스팅 시도 #$i"
-          node auto-post-direct.js || break
-          echo "⏳ 다음 포스팅까지 30초 대기..."
-          sleep 30
-        done
+        # 오늘자 모든 게시글 업로드
+        node auto-post-all-today.js
         
         echo "✅ 포스팅 단계 완료"
     

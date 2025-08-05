@@ -7,13 +7,18 @@ on:
   workflow_dispatch:  # 수동 실행 가능
     inputs:
       post_id:
-        description: 'Specific post ID to upload'
+        description: 'Specific post ID to upload (empty = post all today)'
         required: false
         type: string
       post_title:
         description: 'Post title for logging'
         required: false
         type: string
+      post_all_today:
+        description: 'Post all today crawled posts'
+        required: false
+        type: boolean
+        default: true
   repository_dispatch:
     types: [new-post-available]
 
@@ -122,7 +127,7 @@ jobs:
         NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
         HEADLESS: 'true'
         POST_ID: ${{ github.event.inputs.post_id }}
-      timeout-minutes: 5
+      timeout-minutes: 30  # 여러 게시글 업로드 시간 고려
       run: |
         echo "🚀 자동 포스팅 시작"
         
@@ -142,12 +147,22 @@ jobs:
           exit 1
         fi
         
-        if [ -n "${{ github.event.inputs.post_title }}" ]; then
-          echo "📋 게시글: ${{ github.event.inputs.post_title }}"
+        # 특정 게시글 ID가 지정된 경우
+        if [ -n "${{ github.event.inputs.post_id }}" ]; then
+          echo "📋 특정 게시글 업로드: ${{ github.event.inputs.post_id }}"
+          if [ -n "${{ github.event.inputs.post_title }}" ]; then
+            echo "📋 제목: ${{ github.event.inputs.post_title }}"
+          fi
+          node auto-post-direct.js
+        # 오늘자 모든 게시글 업로드 (기본값 또는 명시적 선택)
+        elif [ "${{ github.event.inputs.post_all_today }}" != "false" ]; then
+          echo "📅 오늘 크롤링한 모든 게시글 업로드"
+          node auto-post-all-today.js
+        # 단일 pending 게시글 업로드
+        else
+          echo "📝 pending 상태의 첫 번째 게시글 업로드"
+          node auto-post-direct.js
         fi
-        
-        # headless 모드로 실행
-        node auto-post-direct.js
     
     - name: Notify Make.com
       if: always()
