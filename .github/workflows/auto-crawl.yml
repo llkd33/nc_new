@@ -53,14 +53,14 @@ jobs:
         fi
         
         # 여러 크롤러 순차 시도
-        node crawler-improved.js || {
-          echo "⚠️ 개선된 크롤러 실패, 로그인 크롤러 시도"
-          node crawler-advanced.js || {
-            echo "⚠️ 로그인 크롤러 실패, 직접 URL 크롤러 시도"
-            node crawler-direct.js || {
-              echo "⚠️ 직접 크롤러 실패, 검색 크롤러 시도"
-              node crawler-api.js || {
-                echo "⚠️ 검색 크롤러 실패, 공개 게시글 크롤러 시도"
+        node crawler-stealth.js || {
+          echo "⚠️ Stealth 크롤러 실패, 개선된 크롤러 시도"
+          node crawler-improved.js || {
+            echo "⚠️ 개선된 크롤러 실패, 로그인 크롤러 시도"
+            node crawler-advanced.js || {
+              echo "⚠️ 로그인 크롤러 실패, 직접 URL 크롤러 시도"
+              node crawler-direct.js || {
+                echo "⚠️ 직접 크롤러 실패, 공개 게시글 크롤러 시도"
                 node crawler-public.js || {
                   echo "❌ 모든 크롤러 실패"
                   exit 1
