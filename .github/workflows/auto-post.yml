@@ -148,16 +148,11 @@ jobs:
     
     - name: Notify Make.com
       if: always()
-      continue-on-error: true  # 실패해도 워크플로우는 성공으로 처리
       run: |
-        if [ -n "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
-          curl -X POST ${{ secrets.MAKE_WEBHOOK_URL }} \
-            -H "Content-Type: application/json" \
-            -d '{
-              "status": "${{ job.status }}",
-              "source": "github-actions",
-              "post_id": "${{ github.event.inputs.post_id }}"
-            }' || true
-        else
-          echo "ℹ️ MAKE_WEBHOOK_URL not configured, skipping notification"
-        fi
+        curl -X POST ${{ secrets.MAKE_WEBHOOK_URL }} \
+          -H "Content-Type: application/json" \
+          -d '{
+            "status": "${{ job.status }}",
+            "source": "github-actions",
+            "post_id": "${{ github.event.inputs.post_id }}"
+          }'
