@@ -1,0 +1,39 @@
+name: Selenium Crawl and Post
+
+on:
+  workflow_dispatch:  # 수동 실행만
+
+jobs:
+  selenium-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+    
+    - name: Run Selenium Crawler
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: 'true'
+        GITHUB_ACTIONS: 'true'
+      run: |
+        echo "🚀 Selenium 크롤러 시작"
+        node selenium-all-in-one.js all
+        echo "✅ 완료"
