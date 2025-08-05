@@ -529,12 +529,14 @@ export async function crawlAllCafes() {
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--disable-web-security',
-            '--disable-features=IsolateOrigins',
+            '--disable-features=IsolateOrigins,site-per-process',
             '--disable-site-isolation-trials',
             '--disable-accelerated-2d-canvas',
             '--window-size=1920,1080',
             '--start-maximized',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            '--enable-features=NetworkService,NetworkServiceInProcess',
+            '--disable-features=VizDisplayCompositor',
+            '--force-color-profile=srgb'
         ]
     });
     
@@ -556,10 +558,8 @@ export async function crawlAllCafes() {
             }
         });
         
-        const page = await context.newPage();
-        
-        // 봇 감지 우회 설정 - 페이지 생성 직후
-        await page.evaluateOnNewDocument(() => {
+        // 봇 감지 우회 설정 - context 레벨에서 설정
+        await context.addInitScript(() => {
             // webdriver 속성 제거
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
@@ -576,12 +576,14 @@ export async function crawlAllCafes() {
             });
             
             // 권한 API 오버라이드
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Notification.permission }) :
-                    originalQuery(parameters)
-            );
+            if (window.navigator.permissions) {
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+            }
             
             // Chrome 드라이버 확인 우회
             window.chrome = {
@@ -595,6 +597,8 @@ export async function crawlAllCafes() {
                 })
             });
         });
+        
+        const page = await context.newPage();
         
         // 디버그 모드
         if (DEBUG_MODE) {
