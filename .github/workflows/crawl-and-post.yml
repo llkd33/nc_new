@@ -1,0 +1,85 @@
+name: Crawl and Post (All-in-One)
+
+on:
+  schedule:
+    # 매일 오전 10시, 오후 3시, 오후 8시 실행 (KST)
+    - cron: '0 1,6,11 * * *'  # UTC 기준
+  workflow_dispatch:  # 수동 실행 가능
+    inputs:
+      skip_crawl:
+        description: 'Skip crawling (only post existing)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  crawl-and-post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm config set loglevel warn
+        npm config set progress false
+        npm ci --prefer-offline --no-optional || npm install --legacy-peer-deps --no-audit --no-fund
+      timeout-minutes: 8
+    
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+      timeout-minutes: 5
+    
+    # 크롤링 단계
+    - name: Run crawler
+      if: github.event.inputs.skip_crawl != 'true'
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      timeout-minutes: 20
+      run: |
+        echo "🕷️ 네이버 카페 크롤링 시작"
+        node crawler-advanced.js || echo "⚠️ 크롤링 중 일부 오류 발생 (계속 진행)"
+        echo "✅ 크롤링 단계 완료"
+    
+    # 잠시 대기 (DB 동기화)
+    - name: Wait for DB sync
+      run: sleep 5
+    
+    # 포스팅 단계
+    - name: Run auto poster
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: 'true'
+      timeout-minutes: 10
+      run: |
+        echo "🚀 자동 포스팅 시작"
+        
+        # 최대 3개까지 연속 포스팅
+        for i in 1 2 3; do
+          echo "📝 포스팅 시도 #$i"
+          node auto-post-direct.js || break
+          echo "⏳ 다음 포스팅까지 30초 대기..."
+          sleep 30
+        done
+        
+        echo "✅ 포스팅 단계 완료"
+    
+    - name: Summary
+      if: always()
+      run: |
+        echo "## 📊 작업 요약" >> $GITHUB_STEP_SUMMARY
+        echo "- 크롤링: ${{ github.event.inputs.skip_crawl != 'true' && '실행됨' || '건너뜀' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- 포스팅: 실행됨" >> $GITHUB_STEP_SUMMARY
+        echo "- 전체 상태: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

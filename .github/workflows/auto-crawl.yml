@@ -1,0 +1,74 @@
+name: Auto Crawl Naver Cafes
+
+on:
+  schedule:
+    # 매일 오전 9시 크롤링 (포스팅 1시간 전)
+    - cron: '0 0 * * *'  # UTC 기준 (KST 9시)
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm config set loglevel warn
+        npm config set progress false
+        npm ci --prefer-offline --no-optional || npm install --legacy-peer-deps --no-audit --no-fund
+      timeout-minutes: 8
+    
+    - name: Install Playwright browsers
+      run: npx playwright install chromium
+      timeout-minutes: 5
+    
+    - name: Run crawler
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      timeout-minutes: 20
+      run: |
+        echo "🕷️ 네이버 카페 크롤링 시작"
+        echo "📍 부동산스터디, 부린이집 카페 크롤링"
+        
+        # 크롤러 실행
+        node crawler-advanced.js
+        
+        echo "✅ 크롤링 완료"
+    
+    - name: Trigger auto post workflow
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'auto-post.yml',
+            ref: 'main'
+          });
+          console.log('✅ 포스팅 워크플로우 트리거됨');
+    
+    - name: Notify Make.com
+      if: always()
+      continue-on-error: true
+      run: |
+        if [ -n "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.MAKE_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event": "crawl_completed",
+              "status": "${{ job.status }}",
+              "source": "github-actions"
+            }'
+        fi
