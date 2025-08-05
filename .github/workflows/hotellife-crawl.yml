@@ -39,7 +39,7 @@ jobs:
       run: |
         echo "🏨 호텔라이프 카페 크롤링 시작"
         echo "📅 실행 시간: $(date '+%Y-%m-%d %H:%M:%S')"
-        node selenium-hotellife.js
+        node hotel-crawler.js
         echo "✅ 크롤링 완료"
     
     - name: Upload screenshots

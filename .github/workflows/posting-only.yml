@@ -1,0 +1,192 @@
+name: Posting Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: 'Post ID from Supabase'
+        required: true
+      title:
+        description: 'Post title'
+        required: true
+      author:
+        description: 'Post author'
+        required: true
+      content:
+        description: 'Post content HTML'
+        required: true
+      cafe_name:
+        description: 'Source cafe name'
+        required: true
+
+jobs:
+  post-to-cafe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        google-chrome --version
+    
+    - name: Create posting script
+      run: |
+        cat > post-single.js << 'EOF'
+        import { Builder, By, Key } from 'selenium-webdriver';
+        import chrome from 'selenium-webdriver/chrome.js';
+        import dotenv from 'dotenv';
+
+        dotenv.config();
+
+        const NAVER_ID = process.env.NAVER_ID;
+        const NAVER_PASSWORD = process.env.NAVER_PASSWORD;
+        const TARGET_CAFE = {
+            url: 'https://cafe.naver.com/atohealing',
+            menuId: '7'
+        };
+
+        // Get inputs from environment
+        const POST_TITLE = process.env.POST_TITLE;
+        const POST_AUTHOR = process.env.POST_AUTHOR;
+        const POST_CONTENT = process.env.POST_CONTENT;
+        const CAFE_NAME = process.env.CAFE_NAME;
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function login(driver) {
+            console.log('🔐 네이버 로그인 시작...');
+            
+            await driver.get('https://www.naver.com');
+            await delay(3000);
+            
+            await driver.executeScript(`
+                const loginBtn = document.querySelector('.link_login');
+                if (loginBtn) loginBtn.click();
+            `);
+            
+            await delay(3000);
+            
+            const idInput = await driver.findElement(By.id('id'));
+            await idInput.click();
+            await delay(500);
+            
+            for (const char of NAVER_ID) {
+                await idInput.sendKeys(char);
+                await delay(100 + Math.random() * 200);
+            }
+            
+            await delay(1000);
+            await idInput.sendKeys(Key.TAB);
+            await delay(500);
+            
+            const pwInput = await driver.findElement(By.id('pw'));
+            for (const char of NAVER_PASSWORD) {
+                await pwInput.sendKeys(char);
+                await delay(100 + Math.random() * 200);
+            }
+            
+            await delay(1000);
+            await pwInput.sendKeys(Key.ENTER);
+            await delay(5000);
+            
+            return true;
+        }
+
+        async function postToCafe(driver) {
+            console.log('📝 포스팅 시작...');
+            
+            // 글쓰기 페이지로 이동
+            const writeUrl = `${TARGET_CAFE.url}/cafe-info/CafeWriteForm.nhn?menuid=${TARGET_CAFE.menuId}`;
+            await driver.get(writeUrl);
+            await delay(3000);
+            
+            // iframe 전환
+            await driver.switchTo().defaultContent();
+            const writeIframe = await driver.findElement(By.id('cafe_main'));
+            await driver.switchTo().frame(writeIframe);
+            
+            // 제목 입력
+            const titleWithSource = `[${CAFE_NAME}] ${POST_TITLE}`;
+            const titleInput = await driver.findElement(By.css('input[name="title"], #subject'));
+            await titleInput.click();
+            await titleInput.clear();
+            await titleInput.sendKeys(titleWithSource);
+            await delay(1000);
+            
+            // 내용 입력
+            try {
+                const se3 = await driver.findElement(By.css('.se-container'));
+                if (se3) {
+                    await driver.executeScript(`
+                        const editor = document.querySelector('.se-container');
+                        const editArea = editor.querySelector('.se-text-paragraph');
+                        if (editArea) {
+                            editArea.innerHTML = arguments[0];
+                            editArea.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    `, `${POST_CONTENT}<br><br><p>출처: ${CAFE_NAME} - ${POST_AUTHOR}</p>`);
+                }
+            } catch (e) {
+                const textarea = await driver.findElement(By.css('textarea[name="content"], #content'));
+                await textarea.click();
+                await textarea.clear();
+                await textarea.sendKeys(POST_CONTENT.replace(/<[^>]*>/g, ''));
+            }
+            
+            await delay(2000);
+            
+            // 등록 버튼 클릭
+            const submitBtn = await driver.findElement(By.css('.btn-write-article, #cafewritebtn, button[type="submit"]'));
+            await submitBtn.click();
+            
+            await delay(3000);
+            console.log('✅ 포스팅 완료!');
+        }
+
+        async function main() {
+            const options = new chrome.Options();
+            options.addArguments('--disable-blink-features=AutomationControlled');
+            options.addArguments('--no-sandbox');
+            options.addArguments('--disable-dev-shm-usage');
+            options.addArguments('--headless=new');
+            
+            const driver = await new Builder()
+                .forBrowser('chrome')
+                .setChromeOptions(options)
+                .build();
+            
+            try {
+                await login(driver);
+                await postToCafe(driver);
+            } finally {
+                await driver.quit();
+            }
+        }
+
+        main().catch(console.error);
+        EOF
+    
+    - name: Run posting
+      env:
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        POST_TITLE: ${{ github.event.inputs.title }}
+        POST_AUTHOR: ${{ github.event.inputs.author }}
+        POST_CONTENT: ${{ github.event.inputs.content }}
+        CAFE_NAME: ${{ github.event.inputs.cafe_name }}
+      run: node post-single.js

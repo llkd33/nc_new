@@ -26,10 +26,7 @@ const SOURCE_CAFES = {
     }
 };
 
-const TARGET_CAFE = {
-    url: 'https://cafe.naver.com/atohealing',
-    menuId: '7'
-};
+// TARGET_CAFE removed - Make.com will handle posting
 
 // 헬퍼 함수
 function delay(ms) {
@@ -307,7 +304,8 @@ async function crawlCafePosts(driver, cafeConfig) {
     return results;
 }
 
-// 카페에 게시글 포스팅
+// 포스팅 기능 제거 - Make.com이 처리
+/*
 async function postToCafe(driver, posts) {
     console.log(`\n📝 ${TARGET_CAFE.url} 카페에 포스팅 시작...`);
     const postedPosts = [];
@@ -386,6 +384,7 @@ async function postToCafe(driver, posts) {
     
     return postedPosts;
 }
+*/
 
 // Supabase 저장
 async function saveToSupabase(posts) {
@@ -407,10 +406,16 @@ async function saveToSupabase(posts) {
             return [];
         }
         
-        // 저장
+        // status를 'pending'으로 설정하여 Make.com이 처리할 수 있도록 함
+        const postsWithStatus = newPosts.map(post => ({
+            ...post,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        }));
+        
         const { data, error } = await supabase
             .from('naver_cafe_posts')
-            .insert(newPosts)
+            .insert(postsWithStatus)
             .select();
         
         if (error) throw error;
@@ -466,7 +471,6 @@ async function main() {
     
     let driver;
     const allCrawledPosts = [];
-    let allPostedPosts = [];
     
     try {
         console.log('🌐 Chrome 브라우저 시작 중...');
@@ -539,19 +543,10 @@ async function main() {
             console.log(`\n💾 총 ${allCrawledPosts.length}개 게시글 저장 중...`);
             const savedPosts = await saveToSupabase(allCrawledPosts);
             
-            // 포스팅
+            // Make.com이 포스팅 처리
             if (savedPosts.length > 0) {
-                console.log(`\n📤 ${savedPosts.length}개 게시글 포스팅 시작...`);
-                allPostedPosts = await postToCafe(driver, savedPosts);
-                
-                // 포스팅 상태 업데이트
-                if (allPostedPosts.length > 0) {
-                    const urls = allPostedPosts.map(p => p.original_url);
-                    await supabase
-                        .from('naver_cafe_posts')
-                        .update({ status: 'posted', posted_at: new Date().toISOString() })
-                        .in('original_url', urls);
-                }
+                console.log(`\n✅ ${savedPosts.length}개 게시글이 저장되었습니다.`);
+                console.log(`📤 Make.com이 자동으로 포스팅을 처리할 예정입니다.`);
             }
         }
         
@@ -564,9 +559,10 @@ async function main() {
         }
     }
     
-    console.log(`\n✨ 작업 완료!`);
-    console.log(`📊 크롤링: ${allCrawledPosts.length}개`);
-    console.log(`📤 포스팅: ${allPostedPosts.length}개`);
+    console.log(`\n✨ 크롤링 작업 완료!`);
+    console.log(`📊 총 크롤링: ${allCrawledPosts.length}개 게시글`);
+    console.log(`💾 Supabase에 저장됨 (status: pending)`);
+    console.log(`📤 Make.com이 자동으로 포스팅을 처리합니다`);
 }
 
 // 실행

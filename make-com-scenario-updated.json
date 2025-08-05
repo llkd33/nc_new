@@ -1,0 +1,278 @@
+{
+    "name": "Naver Cafe Auto Posting",
+    "flow": [
+        {
+            "id": 1,
+            "module": "supabase:watchRows",
+            "version": 1,
+            "parameters": {
+                "__IMTCONN__": 4634387
+            },
+            "mapper": {
+                "table": "naver_cafe_posts",
+                "select": "*",
+                "order": "created_at.asc",
+                "limit": 5,
+                "search": {
+                    "mode": "simple",
+                    "conditions": [
+                        {
+                            "column": "status",
+                            "operator": "text:eq.",
+                            "value": "pending"
+                        }
+                    ]
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "data": {
+                                "scoped": "true",
+                                "connection": "supabase"
+                            },
+                            "label": "Naver Cafe DB"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:supabase",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "interface": [
+                    {
+                        "name": "id",
+                        "type": "text",
+                        "label": "id"
+                    },
+                    {
+                        "name": "cafe_name",
+                        "type": "text",
+                        "label": "cafe_name"
+                    },
+                    {
+                        "name": "board_name",
+                        "type": "text",
+                        "label": "board_name"
+                    },
+                    {
+                        "name": "title",
+                        "type": "text",
+                        "label": "title"
+                    },
+                    {
+                        "name": "author",
+                        "type": "text",
+                        "label": "author"
+                    },
+                    {
+                        "name": "created_at",
+                        "type": "text",
+                        "label": "created_at"
+                    },
+                    {
+                        "name": "content_html",
+                        "type": "text",
+                        "label": "content_html"
+                    },
+                    {
+                        "name": "original_url",
+                        "type": "text",
+                        "label": "original_url"
+                    },
+                    {
+                        "name": "status",
+                        "type": "text",
+                        "label": "status"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": false,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "https://api.github.com/repos/llkd33/nc_new/actions/workflows/posting-only.yml/dispatches",
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Accept",
+                        "value": "application/vnd.github+json"
+                    },
+                    {
+                        "name": "Authorization",
+                        "value": "Bearer YOUR_GITHUB_TOKEN_HERE"
+                    },
+                    {
+                        "name": "X-GitHub-Api-Version",
+                        "value": "2022-11-28"
+                    }
+                ],
+                "bodyType": "raw",
+                "contentType": "application/json",
+                "data": "{\n    \"ref\": \"main\",\n    \"inputs\": {\n        \"post_id\": \"{{1.id}}\",\n        \"title\": \"{{1.title}}\",\n        \"author\": \"{{1.author}}\",\n        \"content\": \"{{1.content_html}}\",\n        \"cafe_name\": \"{{1.cafe_name}}\"\n    }\n}",
+                "timeout": 30000,
+                "shareCookies": false,
+                "parseResponse": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false,
+                "rejectUnauthorized": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0
+                }
+            }
+        },
+        {
+            "id": 3,
+            "module": "builtin:BasicRouter",
+            "version": 1,
+            "mapper": null,
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0
+                }
+            },
+            "routes": [
+                {
+                    "flow": [
+                        {
+                            "id": 4,
+                            "module": "supabase:updateARecord",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 4634387
+                            },
+                            "filter": {
+                                "name": "Success",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{2.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "id": "{{1.id}}",
+                                "table": "naver_cafe_posts",
+                                "record": {
+                                    "status": "posted",
+                                    "posted_at": "{{now}}"
+                                }
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": -150
+                                },
+                                "restore": {
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "supabase"
+                                            },
+                                            "label": "Naver Cafe DB"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 5,
+                            "module": "supabase:updateARecord",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 4634387
+                            },
+                            "filter": {
+                                "name": "Failed",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{2.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:notequal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "id": "{{1.id}}",
+                                "table": "naver_cafe_posts",
+                                "record": {
+                                    "status": "failed",
+                                    "error_message": "GitHub Actions dispatch failed: {{2.statusCode}} - {{2.error}}"
+                                }
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": 150
+                                },
+                                "restore": {
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "supabase"
+                                            },
+                                            "label": "Naver Cafe DB"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us2.make.com"
+    }
+}
