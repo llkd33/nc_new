@@ -1,0 +1,43 @@
+name: Hotel Life Crawler
+
+on:
+  workflow_dispatch:  # 수동 실행
+  schedule:
+    - cron: '0 2 * * *'  # 매일 오전 11시 (KST)
+
+jobs:
+  crawl-hotellife:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        google-chrome --version
+    
+    - name: Run Hotel Life Crawler
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        NAVER_ID: ${{ secrets.NAVER_ID }}
+        NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        HEADLESS: 'true'
+        GITHUB_ACTIONS: 'true'
+      run: |
+        echo "🏨 호텔라이프 카페 크롤링 시작"
+        echo "📅 실행 시간: $(date '+%Y-%m-%d %H:%M:%S')"
+        node selenium-hotellife.js
+        echo "✅ 크롤링 완료"

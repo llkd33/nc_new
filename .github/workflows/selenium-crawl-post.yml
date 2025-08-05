@@ -58,11 +58,8 @@ jobs:
         GITHUB_ACTIONS: 'true'
       run: |
         echo "🚀 Selenium 크롤러 시작"
-        echo "🥷 Undetected 모드로 실행..."
-        node selenium-undetected.js || {
-          echo "⚠️ Undetected 실패, 기본 크롤러 시도"
-          node selenium-all-in-one.js all
-        }
+        echo "🏨 호텔라이프 전용 크롤러 실행..."
+        node selenium-hotellife.js
         echo "✅ 완료"
     
     - name: Upload screenshots if failed
