@@ -11,12 +11,20 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        clean: true
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
     
+    - name: Check current code
+      run: |
+        echo "📋 현재 카페 설정 확인:"
+        grep -A5 "SOURCE_CAFES\|CAFE_CONFIG" selenium-undetected.js || true
+        
     - name: Install dependencies
       run: npm install
     
