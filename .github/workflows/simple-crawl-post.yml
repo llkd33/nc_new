@@ -58,3 +58,4 @@ jobs:
         path: |
           *.png
           *.json
+        retention-days: 7
