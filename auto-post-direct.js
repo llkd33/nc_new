@@ -18,22 +18,40 @@ const CAFE_INFO = {
 };
 
 async function postToNaverCafe() {
-  if (!POST_ID) {
-    console.log('❌ POST_ID 환경변수가 없습니다. 종료합니다.');
-    return;
+  let targetPost;
+  
+  if (POST_ID) {
+    // POST_ID가 지정된 경우 해당 게시글 조회
+    console.log(`📋 지정된 게시글 ID: ${POST_ID}`);
+    const { data: post, error } = await supabase
+      .from('naver_cafe_posts')
+      .select('*')
+      .eq('id', POST_ID)
+      .single();
+    
+    if (error || !post) {
+      console.error('❌ 지정된 게시글을 찾을 수 없습니다:', error?.message);
+      return;
+    }
+    targetPost = post;
+  } else {
+    // POST_ID가 없으면 pending 상태의 첫 번째 게시글 조회
+    console.log('🔍 pending 상태의 게시글을 찾는 중...');
+    const { data: posts, error } = await supabase
+      .from('naver_cafe_posts')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    
+    if (error || !posts || posts.length === 0) {
+      console.log('ℹ️ 업로드할 게시글이 없습니다.');
+      return;
+    }
+    targetPost = posts[0];
   }
 
-  // 1. Supabase에서 해당 post_id의 게시글 조회
-  const { data: post, error } = await supabase
-    .from('naver_cafe_posts')
-    .select('*')
-    .eq('id', POST_ID)
-    .single();
-
-  if (error || !post) {
-    console.error('❌ 게시글을 조회할 수 없습니다:', error?.message);
-    return;
-  }
+  const post = targetPost;
 
   console.log(`📋 업로드 시작: ${post.title}`);
 

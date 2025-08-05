@@ -151,11 +151,16 @@ jobs:
     
     - name: Notify Make.com
       if: always()
+      continue-on-error: true
       run: |
-        curl -X POST ${{ secrets.MAKE_WEBHOOK_URL }} \
-          -H "Content-Type: application/json" \
-          -d '{
-            "status": "${{ job.status }}",
-            "source": "github-actions",
-            "post_id": "${{ github.event.inputs.post_id }}"
-          }'
+        if [ -n "${{ secrets.MAKE_WEBHOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.MAKE_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "${{ job.status }}",
+              "source": "github-actions",
+              "post_id": "${{ github.event.inputs.post_id }}"
+            }'
+        else
+          echo "ℹ️ MAKE_WEBHOOK_URL not set, skipping notification"
+        fi
