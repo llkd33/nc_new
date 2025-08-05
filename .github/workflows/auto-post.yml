@@ -58,22 +58,19 @@ jobs:
         # 환경변수 확인
         if [ -z "$SUPABASE_URL" ]; then
           echo "⚠️ SUPABASE_URL is not set"
-          echo "has_posts=false" >> $GITHUB_OUTPUT
+          echo "has_posts=false" >> "$GITHUB_OUTPUT"
           exit 0
         fi
         
         if [ -z "$SUPABASE_ANON_KEY" ]; then
           echo "⚠️ SUPABASE_ANON_KEY is not set"
-          echo "has_posts=false" >> $GITHUB_OUTPUT
+          echo "has_posts=false" >> "$GITHUB_OUTPUT"
           exit 0
         fi
         
         # JavaScript 파일로 실행
-        cat > check-posts.js << 'EOF'
+        cat > check-posts.mjs << 'EOF'
         import { createClient } from '@supabase/supabase-js';
-        import dotenv from 'dotenv';
-        
-        dotenv.config();
         
         const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -108,7 +105,13 @@ jobs:
         checkPosts();
         EOF
         
-        node check-posts.js >> $GITHUB_OUTPUT
+        # 실행 결과를 GitHub Output에 저장
+        OUTPUT=$(node check-posts.mjs 2>&1 | grep -E '^has_posts=' | tail -1)
+        if [ -n "$OUTPUT" ]; then
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+        else
+          echo "has_posts=false" >> "$GITHUB_OUTPUT"
+        fi
     
     - name: Run auto poster
       if: steps.check.outputs.has_posts == 'true' || github.event.inputs.post_id != ''
