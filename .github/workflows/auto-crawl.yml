@@ -52,7 +52,7 @@ jobs:
       timeout-minutes: 20
       run: |
         echo "🕷️ 네이버 카페 크롤링 시작"
-        echo "📍 부동산스터디, 부린이집 카페 크롤링"
+        echo "📍 호텔라이프 카페 크롤링"
         
         # Selenium 올인원 크롤러 우선 시도
         echo "🚀 Selenium 올인원 크롤러 실행 (크롤링만)..."

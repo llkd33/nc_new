@@ -43,7 +43,7 @@ jobs:
         GITHUB_ACTIONS: 'true'
       run: |
         echo "🚀 시작: $(date '+%Y-%m-%d %H:%M:%S')"
-        echo "📍 부동산스터디, 부린이집 → atohealing"
+        echo "📍 호텔라이프 → atohealing"
         
         # 올인원 실행 (크롤링 + 포스팅)
         node selenium-all-in-one.js all

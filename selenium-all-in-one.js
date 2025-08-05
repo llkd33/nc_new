@@ -25,17 +25,11 @@ const TARGET_CAFE = {
 
 // 크롤링할 카페 설정
 const SOURCE_CAFES = {
-    '부동산스터디': {
-        clubId: '10322296',
-        menuId: '334',
-        cafeName: '부동산스터디',
-        cafeUrl: 'https://cafe.naver.com/jaegebal'
-    },
-    '부린이집': {
-        clubId: '29738397',
-        menuId: '12',
-        cafeName: '부린이집',
-        cafeUrl: 'https://cafe.naver.com/burini'
+    '호텔라이프': {
+        clubId: '18786605',
+        menuId: '105',
+        cafeName: '호텔라이프',
+        cafeUrl: 'https://cafe.naver.com/hotellife'
     }
 };
 
