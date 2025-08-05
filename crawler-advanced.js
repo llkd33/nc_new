@@ -12,6 +12,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL;
 const NAVER_ID = process.env.NAVER_ID;
 const NAVER_PASSWORD = process.env.NAVER_PASSWORD;
+const NAVER_COOKIES = process.env.NAVER_COOKIES; // Base64 인코딩된 쿠키
 const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
 const HEADLESS = process.env.HEADLESS !== 'false';
 
@@ -100,8 +101,19 @@ async function saveCookies(page) {
 
 async function loadCookies(context) {
     try {
-        const cookieData = await fs.readFile(CRAWL_CONFIG.COOKIE_FILE, 'utf-8');
-        const cookies = JSON.parse(cookieData);
+        let cookies;
+        
+        // 환경변수에서 Base64 쿠키 확인
+        if (NAVER_COOKIES) {
+            console.log('🍪 환경변수에서 쿠키 로드 중...');
+            const cookieData = Buffer.from(NAVER_COOKIES, 'base64').toString('utf-8');
+            cookies = JSON.parse(cookieData);
+        } else {
+            // 파일에서 쿠키 로드
+            const cookieData = await fs.readFile(CRAWL_CONFIG.COOKIE_FILE, 'utf-8');
+            cookies = JSON.parse(cookieData);
+        }
+        
         await context.addCookies(cookies);
         console.log('✅ 쿠키 로드 완료');
         return true;
@@ -515,9 +527,8 @@ export async function crawlAllCafes() {
     console.log('🚀 네이버 카페 크롤링 시작');
     console.log(`⚙️  설정: ${CRAWL_CONFIG.POSTS_PER_CAFE}개씩, 최근 ${CRAWL_CONFIG.CRAWL_PERIOD_DAYS}일`);
     
-    if (!NAVER_ID || !NAVER_PASSWORD) {
-        console.error('❌ 네이버 계정 정보가 없습니다. 환경변수를 확인하세요.');
-        return [];
+    if (!NAVER_COOKIES && (!NAVER_ID || !NAVER_PASSWORD)) {
+        console.log('⚠️  로그인 정보가 없습니다. 공개 게시글만 크롤링 가능합니다.');
     }
     
     const browser = await chromium.launch({
@@ -611,22 +622,38 @@ export async function crawlAllCafes() {
         
         // 로그인 체크
         if (!hasStoredCookies) {
-            const loginSuccess = await loginToNaver(page);
-            if (!loginSuccess) {
-                throw new Error('네이버 로그인 실패');
-            }
-        } else {
-            // 쿠키로 로그인 상태 확인
-            await page.goto('https://naver.com');
-            const isLoggedIn = await page.evaluate(() => {
-                return document.querySelector('.link_login') === null;
-            });
-            
-            if (!isLoggedIn) {
-                console.log('⚠️  쿠키 만료, 재로그인 필요');
+            // 쿠키가 없고 ID/PW가 있으면 로그인 시도
+            if (NAVER_ID && NAVER_PASSWORD) {
                 const loginSuccess = await loginToNaver(page);
                 if (!loginSuccess) {
                     throw new Error('네이버 로그인 실패');
+                }
+            } else {
+                console.log('⚠️  로그인 정보가 없습니다. 공개 게시글만 크롤링 가능합니다.');
+                // 로그인 없이 계속 진행
+            }
+        } else {
+            // 쿠키로 로그인 상태 확인
+            console.log('🔍 로그인 상태 확인 중...');
+            await page.goto('https://naver.com');
+            
+            const isLoggedIn = await page.evaluate(() => {
+                return document.querySelector('.MyView-module__link_logout') !== null || 
+                       document.querySelector('[class*="logout"]') !== null ||
+                       document.querySelector('.link_login') === null;
+            });
+            
+            if (isLoggedIn) {
+                console.log('✅ 쿠키로 로그인 상태 유지됨');
+            } else {
+                console.log('⚠️  쿠키 만료됨');
+                if (NAVER_ID && NAVER_PASSWORD) {
+                    const loginSuccess = await loginToNaver(page);
+                    if (!loginSuccess) {
+                        console.log('⚠️  재로그인 실패, 공개 게시글만 크롤링합니다.');
+                    }
+                } else {
+                    console.log('⚠️  로그인 정보가 없어 공개 게시글만 크롤링합니다.');
                 }
             }
         }

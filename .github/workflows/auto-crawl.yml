@@ -38,13 +38,19 @@ jobs:
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         NAVER_ID: ${{ secrets.NAVER_ID }}
         NAVER_PASSWORD: ${{ secrets.NAVER_PASSWORD }}
+        NAVER_COOKIES: ${{ secrets.NAVER_COOKIES }}
         HEADLESS: 'true'
         GITHUB_ACTIONS: 'true'
       timeout-minutes: 20
       run: |
         echo "🕷️ 네이버 카페 크롤링 시작"
         echo "📍 부동산스터디, 부린이집 카페 크롤링"
-        echo "🔐 네이버 로그인 후 전체 게시글 수집"
+        
+        if [ -n "${{ secrets.NAVER_COOKIES }}" ]; then
+          echo "🍪 저장된 쿠키로 로그인 시도"
+        else
+          echo "🔐 네이버 로그인 후 전체 게시글 수집"
+        fi
         
         # 로그인 크롤러 실행
         node crawler-advanced.js || {
