@@ -2,8 +2,8 @@ name: Auto Crawl Naver Cafes
 
 on:
   schedule:
-    # 매일 오전 9시 크롤링 (포스팅 1시간 전)
-    - cron: '0 0 * * *'  # UTC 기준 (KST 9시)
+    # 매일 오전 9시 30분 크롤링 (포스팅 30분 전)
+    - cron: '30 0 * * *'  # UTC 기준 (KST 9:30)
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
@@ -45,6 +45,14 @@ jobs:
         node crawler-advanced.js
         
         echo "✅ 크롤링 완료"
+    
+    - name: Wait 30 minutes
+      if: success()
+      run: |
+        echo "⏰ 크롤링 데이터 안정화를 위해 30분 대기 중..."
+        echo "🕐 대기 시작: $(date '+%Y-%m-%d %H:%M:%S')"
+        sleep 1800  # 30분 = 1800초
+        echo "✅ 대기 완료: $(date '+%Y-%m-%d %H:%M:%S')"
     
     - name: Trigger auto post workflow
       if: success()

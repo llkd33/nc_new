@@ -50,8 +50,18 @@ jobs:
         node crawler-advanced.js || echo "⚠️ 크롤링 중 일부 오류 발생 (계속 진행)"
         echo "✅ 크롤링 단계 완료"
     
-    # 잠시 대기 (DB 동기화)
-    - name: Wait for DB sync
+    # 30분 대기 (크롤링 데이터 안정화)
+    - name: Wait 30 minutes after crawling
+      if: github.event.inputs.skip_crawl != 'true'
+      run: |
+        echo "⏰ 크롤링 데이터 안정화를 위해 30분 대기 중..."
+        echo "🕐 대기 시작: $(date '+%Y-%m-%d %H:%M:%S')"
+        sleep 1800  # 30분 = 1800초
+        echo "✅ 대기 완료: $(date '+%Y-%m-%d %H:%M:%S')"
+    
+    # 크롤링 건너뛴 경우 짧은 대기
+    - name: Short wait for DB sync
+      if: github.event.inputs.skip_crawl == 'true'
       run: sleep 5
     
     # 포스팅 단계
