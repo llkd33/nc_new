@@ -14,6 +14,7 @@
     "axios": "^1.10.0",
     "cheerio": "^1.1.2",
     "chromedriver": "^138.0.5",
+    "clipboardy": "^4.0.0",
     "dotenv": "^17.2.0",
     "node-fetch": "^3.3.2",
     "playwright": "^1.54.1",

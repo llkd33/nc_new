@@ -621,40 +621,45 @@ export async function crawlAllCafes() {
         const hasStoredCookies = await loadCookies(context);
         
         // 로그인 체크
-        if (!hasStoredCookies) {
-            // 쿠키가 없고 ID/PW가 있으면 로그인 시도
-            if (NAVER_ID && NAVER_PASSWORD) {
-                const loginSuccess = await loginToNaver(page);
-                if (!loginSuccess) {
-                    throw new Error('네이버 로그인 실패');
-                }
-            } else {
-                console.log('⚠️  로그인 정보가 없습니다. 공개 게시글만 크롤링 가능합니다.');
-                // 로그인 없이 계속 진행
-            }
-        } else {
-            // 쿠키로 로그인 상태 확인
-            console.log('🔍 로그인 상태 확인 중...');
-            await page.goto('https://naver.com');
+        if (hasStoredCookies) {
+            // 쿠키가 있으면 로그인 상태 확인
+            console.log('🔍 쿠키로 로그인 상태 확인 중...');
+            await page.goto('https://www.naver.com');
+            await delay(2000);
             
             const isLoggedIn = await page.evaluate(() => {
-                return document.querySelector('.MyView-module__link_logout') !== null || 
-                       document.querySelector('[class*="logout"]') !== null ||
-                       document.querySelector('.link_login') === null;
+                // 여러 로그아웃 버튼 선택자 확인
+                const selectors = [
+                    '.MyView-module__link_logout',
+                    '[class*="logout"]',
+                    '.logout_button',
+                    'a[href*="logout"]'
+                ];
+                
+                for (const selector of selectors) {
+                    if (document.querySelector(selector)) {
+                        return true;
+                    }
+                }
+                
+                // 로그인 버튼이 없으면 로그인된 것
+                return !document.querySelector('.link_login');
             });
             
             if (isLoggedIn) {
-                console.log('✅ 쿠키로 로그인 상태 유지됨');
+                console.log('✅ 쿠키로 로그인 성공!');
             } else {
-                console.log('⚠️  쿠키 만료됨');
-                if (NAVER_ID && NAVER_PASSWORD) {
-                    const loginSuccess = await loginToNaver(page);
-                    if (!loginSuccess) {
-                        console.log('⚠️  재로그인 실패, 공개 게시글만 크롤링합니다.');
-                    }
-                } else {
-                    console.log('⚠️  로그인 정보가 없어 공개 게시글만 크롤링합니다.');
-                }
+                console.log('⚠️  쿠키가 만료되었습니다. ID/PW로 시도합니다.');
+                hasStoredCookies = false;
+            }
+        }
+        
+        // 쿠키가 없거나 만료된 경우
+        if (!hasStoredCookies && NAVER_ID && NAVER_PASSWORD) {
+            console.log('🔐 ID/PW로 로그인 시도...');
+            const loginSuccess = await loginToNaver(page);
+            if (!loginSuccess) {
+                console.log('⚠️  로그인 실패. 공개 게시글만 크롤링합니다.');
             }
         }
         
