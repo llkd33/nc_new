@@ -428,6 +428,7 @@ async function saveToSupabase(posts) {
 async function main() {
     console.log('🥷 Undetected Selenium 크롤러 시작');
     console.log(`🔧 환경: ${IS_GITHUB_ACTIONS ? 'GitHub Actions' : 'Local'}`);
+    console.log(`📍 타겟 카페: 호텔라이프`);
     
     if (!NAVER_ID || !NAVER_PASSWORD) {
         console.error('❌ 네이버 로그인 정보가 필요합니다.');
