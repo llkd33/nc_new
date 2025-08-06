@@ -1,0 +1,255 @@
+{
+    "name": "Naver Cafe Complete Webhook Flow",
+    "flow": [
+        {
+            "id": 1,
+            "module": "gateway:CustomWebHook",
+            "version": 1,
+            "parameters": {
+                "hook": 999999,
+                "maxResults": 1
+            },
+            "mapper": {},
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "hook": {
+                            "data": {
+                                "editable": "true"
+                            },
+                            "label": "Naver Cafe Webhook"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": 2,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "ca": "",
+                "qs": [],
+                "url": "https://api.github.com/repos/llkd33/nc_new/actions/workflows/posting-only.yml/dispatches",
+                "data": "{\n    \"ref\": \"main\",\n    \"inputs\": {\n        \"post_id\": \"{{1.record.id}}\",\n        \"title\": \"{{1.record.title}}\",\n        \"author\": \"{{1.record.author}}\",\n        \"content\": \"{{1.record.content_html}}\",\n        \"cafe_name\": \"{{1.record.cafe_name}}\"\n    }\n}",
+                "gzip": true,
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Accept",
+                        "value": "application/vnd.github+json"
+                    },
+                    {
+                        "name": "Authorization",
+                        "value": "Bearer YOUR_GITHUB_TOKEN_HERE"
+                    },
+                    {
+                        "name": "X-GitHub-Api-Version",
+                        "value": "2022-11-28"
+                    }
+                ],
+                "timeout": "",
+                "useMtls": false,
+                "authPass": "",
+                "authUser": "",
+                "bodyType": "raw",
+                "contentType": "application/json",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "parseResponse": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "rejectUnauthorized": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0
+                }
+            }
+        },
+        {
+            "id": 3,
+            "module": "builtin:BasicRouter",
+            "version": 1,
+            "mapper": null,
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0
+                }
+            },
+            "routes": [
+                {
+                    "flow": [
+                        {
+                            "id": 4,
+                            "module": "http:ActionSendData",
+                            "version": 3,
+                            "parameters": {
+                                "handleErrors": false,
+                                "useNewZLibDeCompress": true
+                            },
+                            "filter": {
+                                "name": "Success - 204",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{2.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "ca": "",
+                                "qs": [],
+                                "url": "{{1.env.SUPABASE_URL}}/rest/v1/naver_cafe_posts?id=eq.{{1.record.id}}",
+                                "data": "{\n    \"status\": \"processing\"\n}",
+                                "gzip": false,
+                                "method": "patch",
+                                "headers": [
+                                    {
+                                        "name": "apikey",
+                                        "value": "YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Authorization",
+                                        "value": "Bearer YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "name": "Prefer",
+                                        "value": "return=minimal"
+                                    }
+                                ],
+                                "timeout": "",
+                                "useMtls": false,
+                                "authPass": "",
+                                "authUser": "",
+                                "bodyType": "raw",
+                                "contentType": "application/json",
+                                "serializeUrl": false,
+                                "shareCookies": false,
+                                "parseResponse": false,
+                                "followRedirect": true,
+                                "useQuerystring": false,
+                                "followAllRedirects": false,
+                                "rejectUnauthorized": true
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": -150
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 5,
+                            "module": "http:ActionSendData",
+                            "version": 3,
+                            "parameters": {
+                                "handleErrors": false,
+                                "useNewZLibDeCompress": true
+                            },
+                            "filter": {
+                                "name": "Failed - Not 204",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{2.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:notequal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "ca": "",
+                                "qs": [],
+                                "url": "{{1.env.SUPABASE_URL}}/rest/v1/naver_cafe_posts?id=eq.{{1.record.id}}",
+                                "data": "{\n    \"status\": \"failed\",\n    \"error_message\": \"GitHub Actions dispatch failed: {{2.statusCode}}\"\n}",
+                                "gzip": false,
+                                "method": "patch",
+                                "headers": [
+                                    {
+                                        "name": "apikey",
+                                        "value": "YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Authorization",
+                                        "value": "Bearer YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "name": "Prefer",
+                                        "value": "return=minimal"
+                                    }
+                                ],
+                                "timeout": "",
+                                "useMtls": false,
+                                "authPass": "",
+                                "authUser": "",
+                                "bodyType": "raw",
+                                "contentType": "application/json",
+                                "serializeUrl": false,
+                                "shareCookies": false,
+                                "parseResponse": false,
+                                "followRedirect": true,
+                                "useQuerystring": false,
+                                "followAllRedirects": false,
+                                "rejectUnauthorized": true
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": 150
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": true,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us2.make.com"
+    }
+}

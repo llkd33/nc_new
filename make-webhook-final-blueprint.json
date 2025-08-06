@@ -1,0 +1,356 @@
+{
+    "name": "Naver Cafe Webhook to GitHub Actions",
+    "flow": [
+        {
+            "id": 1,
+            "module": "gateway:CustomWebHook",
+            "version": 1,
+            "parameters": {
+                "hook": 999999,
+                "maxResults": 1
+            },
+            "mapper": {},
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "hook": {
+                            "data": {
+                                "editable": "true"
+                            },
+                            "label": "Supabase Posts Webhook"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "hook",
+                        "type": "hook:gateway-webhook",
+                        "label": "Webhook",
+                        "required": true
+                    },
+                    {
+                        "name": "maxResults",
+                        "type": "number",
+                        "label": "Maximum number of results"
+                    }
+                ],
+                "interface": [
+                    {
+                        "name": "type",
+                        "type": "text"
+                    },
+                    {
+                        "name": "table",
+                        "type": "text"
+                    },
+                    {
+                        "name": "record",
+                        "type": "collection",
+                        "spec": [
+                            {
+                                "name": "id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "cafe_name",
+                                "type": "text"
+                            },
+                            {
+                                "name": "board_name",
+                                "type": "text"
+                            },
+                            {
+                                "name": "title",
+                                "type": "text"
+                            },
+                            {
+                                "name": "author",
+                                "type": "text"
+                            },
+                            {
+                                "name": "content_html",
+                                "type": "text"
+                            },
+                            {
+                                "name": "status",
+                                "type": "text"
+                            },
+                            {
+                                "name": "original_url",
+                                "type": "text"
+                            },
+                            {
+                                "name": "created_at",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "schema",
+                        "type": "text"
+                    },
+                    {
+                        "name": "old_record",
+                        "type": "collection"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "module": "builtin:BasicFilter",
+            "version": 1,
+            "parameters": {},
+            "filter": {
+                "name": "Only Pending Status",
+                "conditions": [
+                    [
+                        {
+                            "a": "{{1.record.status}}",
+                            "b": "pending",
+                            "o": "text:equal"
+                        }
+                    ]
+                ]
+            },
+            "metadata": {
+                "designer": {
+                    "x": 250,
+                    "y": 0
+                }
+            }
+        },
+        {
+            "id": 3,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "ca": "",
+                "qs": [],
+                "url": "https://api.github.com/repos/llkd33/nc_new/actions/workflows/posting-only.yml/dispatches",
+                "data": "{\n    \"ref\": \"main\",\n    \"inputs\": {\n        \"post_id\": \"{{1.record.id}}\",\n        \"title\": \"{{1.record.title}}\",\n        \"author\": \"{{1.record.author}}\",\n        \"content\": \"{{1.record.content_html}}\",\n        \"cafe_name\": \"{{1.record.cafe_name}}\"\n    }\n}",
+                "gzip": true,
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Accept",
+                        "value": "application/vnd.github+json"
+                    },
+                    {
+                        "name": "Authorization",
+                        "value": "Bearer REPLACE_WITH_YOUR_GITHUB_TOKEN"
+                    },
+                    {
+                        "name": "X-GitHub-Api-Version",
+                        "value": "2022-11-28"
+                    },
+                    {
+                        "name": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "timeout": "",
+                "useMtls": false,
+                "authPass": "",
+                "authUser": "",
+                "bodyType": "raw",
+                "contentType": "application/json",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "parseResponse": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "rejectUnauthorized": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 500,
+                    "y": 0
+                }
+            }
+        },
+        {
+            "id": 4,
+            "module": "builtin:BasicRouter",
+            "version": 1,
+            "mapper": null,
+            "metadata": {
+                "designer": {
+                    "x": 750,
+                    "y": 0
+                }
+            },
+            "routes": [
+                {
+                    "flow": [
+                        {
+                            "id": 5,
+                            "module": "http:ActionSendData",
+                            "version": 3,
+                            "parameters": {
+                                "handleErrors": false,
+                                "useNewZLibDeCompress": true
+                            },
+                            "filter": {
+                                "name": "Success (204)",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{3.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "ca": "",
+                                "qs": [],
+                                "url": "REPLACE_WITH_YOUR_SUPABASE_URL/rest/v1/naver_cafe_posts?id=eq.{{1.record.id}}",
+                                "data": "{\n    \"status\": \"processing\"\n}",
+                                "gzip": false,
+                                "method": "patch",
+                                "headers": [
+                                    {
+                                        "name": "apikey",
+                                        "value": "REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Authorization",
+                                        "value": "Bearer REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "name": "Prefer",
+                                        "value": "return=minimal"
+                                    }
+                                ],
+                                "timeout": "",
+                                "useMtls": false,
+                                "authPass": "",
+                                "authUser": "",
+                                "bodyType": "raw",
+                                "contentType": "application/json",
+                                "serializeUrl": false,
+                                "shareCookies": false,
+                                "parseResponse": false,
+                                "followRedirect": true,
+                                "useQuerystring": false,
+                                "followAllRedirects": false,
+                                "rejectUnauthorized": true
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 1000,
+                                    "y": -150
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 6,
+                            "module": "http:ActionSendData",
+                            "version": 3,
+                            "parameters": {
+                                "handleErrors": false,
+                                "useNewZLibDeCompress": true
+                            },
+                            "filter": {
+                                "name": "Failed (Not 204)",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{3.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:notequal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "ca": "",
+                                "qs": [],
+                                "url": "REPLACE_WITH_YOUR_SUPABASE_URL/rest/v1/naver_cafe_posts?id=eq.{{1.record.id}}",
+                                "data": "{\n    \"status\": \"failed\",\n    \"error_message\": \"GitHub Actions dispatch failed: {{3.statusCode}} - {{3.error}}\"\n}",
+                                "gzip": false,
+                                "method": "patch",
+                                "headers": [
+                                    {
+                                        "name": "apikey",
+                                        "value": "REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Authorization",
+                                        "value": "Bearer REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
+                                    },
+                                    {
+                                        "name": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "name": "Prefer",
+                                        "value": "return=minimal"
+                                    }
+                                ],
+                                "timeout": "",
+                                "useMtls": false,
+                                "authPass": "",
+                                "authUser": "",
+                                "bodyType": "raw",
+                                "contentType": "application/json",
+                                "serializeUrl": false,
+                                "shareCookies": false,
+                                "parseResponse": false,
+                                "followRedirect": true,
+                                "useQuerystring": false,
+                                "followAllRedirects": false,
+                                "rejectUnauthorized": true
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 1000,
+                                    "y": 150
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": true,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us2.make.com"
+    }
+}

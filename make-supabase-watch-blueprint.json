@@ -1,0 +1,203 @@
+{
+    "name": "Naver Cafe Auto Posting (Supabase Watch)",
+    "flow": [
+        {
+            "id": 1,
+            "module": "supabase:watchRowsInATable",
+            "version": 1,
+            "parameters": {
+                "__IMTCONN__": 999999
+            },
+            "mapper": {
+                "table": "naver_cafe_posts",
+                "limit": "5",
+                "order": "created_at",
+                "ascending": true
+            },
+            "filter": {
+                "name": "Only pending posts",
+                "conditions": [
+                    [
+                        {
+                            "a": "{{status}}",
+                            "b": "pending",
+                            "o": "text:equal"
+                        }
+                    ]
+                ]
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "data": {
+                                "scoped": "true",
+                                "connection": "supabase"
+                            },
+                            "label": "My Supabase connection"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": 2,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "ca": "",
+                "qs": [],
+                "url": "https://api.github.com/repos/llkd33/nc_new/actions/workflows/posting-only.yml/dispatches",
+                "data": "{\n    \"ref\": \"main\",\n    \"inputs\": {\n        \"post_id\": \"{{1.id}}\",\n        \"title\": \"{{1.title}}\",\n        \"author\": \"{{1.author}}\",\n        \"content\": \"{{1.content_html}}\",\n        \"cafe_name\": \"{{1.cafe_name}}\"\n    }\n}",
+                "gzip": true,
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Accept",
+                        "value": "application/vnd.github+json"
+                    },
+                    {
+                        "name": "Authorization",
+                        "value": "Bearer YOUR_GITHUB_TOKEN_HERE"
+                    },
+                    {
+                        "name": "X-GitHub-Api-Version",
+                        "value": "2022-11-28"
+                    }
+                ],
+                "timeout": "",
+                "useMtls": false,
+                "authPass": "",
+                "authUser": "",
+                "bodyType": "raw",
+                "contentType": "application/json",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "parseResponse": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "followAllRedirects": false,
+                "rejectUnauthorized": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0
+                }
+            }
+        },
+        {
+            "id": 3,
+            "module": "builtin:BasicRouter",
+            "version": 1,
+            "mapper": null,
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0
+                }
+            },
+            "routes": [
+                {
+                    "flow": [
+                        {
+                            "id": 4,
+                            "module": "supabase:updateARecord",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 999999
+                            },
+                            "filter": {
+                                "name": "Success",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{2.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "id": "{{1.id}}",
+                                "table": "naver_cafe_posts",
+                                "status": "processing"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": -150
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 5,
+                            "module": "supabase:updateARecord",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 999999
+                            },
+                            "filter": {
+                                "name": "Failed",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{2.statusCode}}",
+                                            "b": "204",
+                                            "o": "number:notequal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "id": "{{1.id}}",
+                                "table": "naver_cafe_posts",
+                                "status": "failed",
+                                "error_message": "GitHub Actions failed: {{2.statusCode}}"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": 150
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us2.make.com"
+    }
+}
